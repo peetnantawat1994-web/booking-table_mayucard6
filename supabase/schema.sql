@@ -71,13 +71,17 @@ language sql volatile security definer set search_path = public as $$
     from public.documents where store = 'live' and collection <> 'bookings';
 $$;
 
--- an uploaded file reference: only an https URL + filename survive
+-- an uploaded file reference: only https URLs + filename survive.
+-- dataUrl = the Supabase Storage copy (primary); driveUrl = the Google Drive
+-- copy the team uses (optional, kept only when it is a clean https URL).
 create or replace function public._clean_file(f jsonb) returns jsonb
 language sql immutable as $$
   select case
     when jsonb_typeof(f) = 'object' and (f->>'dataUrl') ~ '^https://[^\s"''<>]+$'
-    then jsonb_build_object('dataUrl', left(f->>'dataUrl', 500),
-                            'filename', left(coalesce(f->>'filename', ''), 120))
+    then jsonb_strip_nulls(jsonb_build_object(
+           'dataUrl',  left(f->>'dataUrl', 500),
+           'filename', left(coalesce(f->>'filename', ''), 120),
+           'driveUrl', case when (f->>'driveUrl') ~ '^https://[^\s"''<>]+$' then left(f->>'driveUrl', 500) end))
   end;
 $$;
 
