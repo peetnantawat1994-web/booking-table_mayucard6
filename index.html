@@ -61,7 +61,7 @@
   }
   /* reserves room at the bottom so the floating multi-select bar never sits
      on top of (and swallows clicks on) the last row of tables */
-  body.has-ms-bar{ padding-bottom:72px; }
+  body.has-ms-bar{ padding-bottom:190px; }
   h1,h2,h3{text-wrap:balance; margin:0;}
   button{font-family:inherit;}
   ::selection{background:var(--accent-soft); color:var(--ink);}
@@ -357,6 +357,7 @@
     background:var(--surface-2); color:var(--ink); font-size:14.5px; font-family:inherit;
   }
   .field input:focus, .field select:focus, .field textarea:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface);}
+  .field input.is-invalid{outline:2px solid var(--bad); outline-offset:1px; background:var(--bad-soft);}
   .field-row{display:flex; gap:10px;}
   .field-row .field{flex:1; min-width:0;}
   .err-text{color:var(--bad); font-size:12.5px; min-height:1.3em; margin:4px 0 2px;}
@@ -510,15 +511,20 @@
   .toast.show{opacity:1; transform:translate(-50%,0);}
 
   .multi-select-bar{
-    /* above .fz-overlay (55) so it's still usable while the floor plan is
-       zoomed full-screen, but below .scrim (60) so a sheet still covers it */
+    /* popup card: appears as soon as one table is picked; above the floor-plan zoom (55), below sheets (60) */
     position:fixed; left:50%; bottom:calc(max(16px, env(safe-area-inset-bottom,0px) + 10px) + var(--badge-space)); transform:translateX(-50%);
-    display:flex; align-items:center; gap:14px; background:var(--surface); border:1px solid var(--line-strong);
-    box-shadow:var(--shadow-md); border-radius:999px; padding:8px 10px 8px 18px; z-index:58;
-    max-width:calc(100% - 32px);
+    display:flex; flex-direction:column; gap:8px; background:var(--surface); border:1px solid var(--line-strong);
+    box-shadow:var(--shadow-lg); border-radius:var(--r-lg); padding:12px 14px; z-index:58;
+    width:min(420px, calc(100% - 24px)); animation:msbIn .18s ease-out;
   }
-  .multi-select-bar .msb-info{font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap;}
-  .multi-select-bar .msb-actions{display:flex; gap:6px; flex:0 0 auto;}
+  @keyframes msbIn{from{opacity:0; transform:translate(-50%,12px);}to{opacity:1; transform:translate(-50%,0);}}
+  .multi-select-bar .msb-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .multi-select-bar .msb-title{font-size:15px; font-weight:800; color:var(--ink);}
+  .multi-select-bar .msb-total{font-size:12.5px; font-weight:700; color:var(--ink-soft);}
+  .multi-select-bar .msb-chips{display:flex; flex-wrap:wrap; gap:5px; max-height:64px; overflow:auto;}
+  .multi-select-bar .msb-chip{font-family:var(--font-mono); font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent);}
+  .multi-select-bar .msb-actions{display:flex; gap:8px;}
+  .multi-select-bar .msb-actions .btn{flex:1;}
   .btn.is-active{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
   .table-btn.is-selected{outline:2px solid var(--accent); outline-offset:-2px;}
   .tbl.is-selected{outline:2.5px solid var(--accent); outline-offset:1px; box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);}
@@ -1019,11 +1025,12 @@
 
 <div class="toast" id="toast"></div>
 
-<div class="multi-select-bar" id="multiSelectBar" hidden>
-  <div class="msb-info" id="msbInfo"></div>
+<div class="multi-select-bar" id="multiSelectBar" hidden role="dialog" aria-live="polite">
+  <div class="msb-head"><div class="msb-title" id="msbTitle"></div><div class="msb-total" id="msbTotal"></div></div>
+  <div class="msb-chips" id="msbChips"></div>
   <div class="msb-actions">
-    <button type="button" class="btn btn-sm" id="btnMsClear" data-i18n="clearSelection">ล้างที่เลือก</button>
-    <button type="button" class="btn btn-sm btn-accent" id="btnMsBook" data-i18n="bookSelected">จองที่เลือก</button>
+    <button type="button" class="btn" id="btnMsClear" data-i18n="clearSelection">ล้างที่เลือก</button>
+    <button type="button" class="btn btn-accent" id="btnMsBook"></button>
   </div>
 </div>
 
@@ -1320,7 +1327,8 @@
       accountNumberCopied:"คัดลอกเลขบัญชีแล้ว", copyBtn:"คัดลอก", transferToAccount:"โอนเงินมาที่บัญชี",
       accountNamePrefix:"ชื่อบัญชี: ", paymentAccountImgAlt:"บัญชีรับเงิน",
       legendFree:"ว่าง", legendPending:"จองแล้ว · รอตรวจสอบสลิป", legendConfirmed:"จองแล้ว · ยืนยันแล้ว", tipPending:"จองแล้ว (รอตรวจสอบ)", tipConfirmed:"จองแล้ว (ยืนยันแล้ว)", dupTitle:"พบข้อมูลการจองซ้ำในระบบ", dupSub:"โปรดเลือกเพื่อดำเนินการต่อ", dupFieldsFmt:"ข้อมูลที่ซ้ำ: {fields}", dupField_shop:"ชื่อร้าน", dupField_contact:"ชื่อผู้จอง", dupField_phone:"เบอร์โทร", dupField_email:"อีเมล", dupMoreBtn:"ยืนยันการจองเพิ่มเติม", dupMoreHint:"จองโต๊ะนี้เพิ่มจากที่เคยจอง ทีมงานจะตรวจกับสลิป (โอนรวมหลายโต๊ะในสลิปเดียวได้)", dupChangeBtn:"ต้องการเปลี่ยนแปลงการจอง", dupChangeHint:"ย้ายโต๊ะที่เคยจองมาเป็นโต๊ะนี้ ต้องแนบสลิปใบเดิมและกรอกข้อมูลเดิม", dupBack:"กลับไปแก้ไขข้อมูล", chTitle:"ขอเปลี่ยนแปลงการจอง", chSub:"ย้ายโต๊ะเดิมมาเป็นโต๊ะใหม่ — กรอกข้อมูลเดิมและแนบสลิปใบเดิมเพื่อตรวจสอบ", chOldTable:"โต๊ะเดิมที่จองไว้", chOldTablePh:"เช่น S24", chNewTable:"ย้ายไปโต๊ะใหม่", chSlipLabel:"สลิปใบเดิม (จำเป็น)", chSubmit:"ส่งคำขอเปลี่ยนแปลง", chNeedSlip:"กรุณาแนบสลิปใบเดิม", chNeedOld:"กรุณากรอกโต๊ะเดิมที่ถูกต้อง", chSentTitle:"ส่งคำขอแล้ว", chSentBody:"ข้อมูลหรือสลิปยังไม่ตรงกับที่เก็บไว้ทั้งหมด ทีมงานจะตรวจสอบและแจ้งกลับ โต๊ะเดิมของคุณยังไม่ถูกเปลี่ยน", chMovedTitle:"เปลี่ยนโต๊ะสำเร็จ", chMovedBody:"ย้ายการจองจากโต๊ะ {old} ไปโต๊ะ {new} เรียบร้อยแล้ว", chErrNotFound:"ไม่พบการจองของโต๊ะเดิมนี้ ตรวจเลขโต๊ะอีกครั้ง", chErrNotAvail:"โต๊ะใหม่ไม่ว่างแล้ว", chErrTooMany:"ส่งคำขอบ่อยเกินไป กรุณาติดต่อทีมงาน", okTitle:"จองโต๊ะสำเร็จ", okTablesFmt:"โต๊ะ: {ids}", okAmountFmt:"ยอดที่ต้องโอน: {amount}", okSlipSent:"ได้รับสลิปแล้ว ทีมงานจะตรวจสอบและยืนยันให้", okSlipLater:"ยังไม่ได้แนบสลิป กรุณาโอนและส่งสลิปให้ทีมงาน เพื่อยืนยันโต๊ะ", okSkippedFmt:"ยกเว้นโต๊ะที่เพิ่งถูกจองไปก่อน: {ids}", okClose:"ตกลง", uploadBadType:"รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WebP)", uploadTooBigFmt:"ไฟล์ใหญ่เกินไป (สูงสุด {mb} MB)", logoHint:"รองรับ JPG / PNG / WebP · แนะนำอย่างน้อย 1240×1748 px เพื่อพิมพ์ขนาด A6", logoOkFmt:"✓ โลโก้ {w}×{h} px — ความละเอียดพอสำหรับพิมพ์ A6", logoLowFmt:"โลโก้ {w}×{h} px ความละเอียดต่ำกว่าที่แนะนำสำหรับพิมพ์ A6 (1240×1748 px) — ส่งต่อได้ แต่งานพิมพ์อาจไม่คมชัด", dupBadgeFmt:"ซ้ำกับ {tables}", dupBadgeConfirmed:"ลูกค้ายืนยันจองเพิ่ม", dupBadgeUnconfirmed:"ไม่ได้ยืนยัน", changesSectionTitle:"คำขอเปลี่ยนแปลงการจอง", changesEmpty:"ยังไม่มีคำขอเปลี่ยนแปลง", changeAuto:"ย้ายอัตโนมัติแล้ว", changeApprove:"อนุมัติและย้าย", changeReject:"ปฏิเสธ", changeApproved:"อนุมัติแล้ว", changeRejected:"ปฏิเสธแล้ว", changePending:"รอตรวจสอบ", changeDecided:"ดำเนินการคำขอแล้ว", changeFailed:"ดำเนินการไม่สำเร็จ (โต๊ะใหม่อาจไม่ว่างแล้ว)", chkData:"ข้อมูลตรง", chkSlip:"สลิป QR ตรง", chkPrice:"ราคาเท่ากัน", changeSlipFile:"ดูสลิปที่แนบ", slipLinkLabel:"ใช้สลิปนี้กับโต๊ะอื่นด้วย (คั่นด้วยจุลภาค เช่น S24, S25)", slipLinkBtn:"ผูกสลิปกับโต๊ะเหล่านี้", slipLinked:"ผูกสลิปแล้ว",
-      chkOk:"ข้อมูลครบแล้ว", chkWarnTitle:"ข้อมูลยังไม่ครบ", issNoSlip:"ยังไม่มีสลิป", issSlipUnchecked:"สลิปยังไม่ได้ตรวจ/ยืนยัน", issSlipBad:"สลิปไม่ผ่าน/ยอดไม่ตรง", issShort:"ยอดโอนไม่ครบ (ขาด {n})", issNoLogo:"ยังไม่มีโลโก้", issDup:"การจองซ้ำยังไม่ได้ตรวจ", issSummaryFmt:"ครบ {ok} · ยังไม่ครบ {bad}"
+      chkOk:"ข้อมูลครบแล้ว", chkWarnTitle:"ข้อมูลยังไม่ครบ", issNoSlip:"ยังไม่มีสลิป", issSlipUnchecked:"สลิปยังไม่ได้ตรวจ/ยืนยัน", issSlipBad:"สลิปไม่ผ่าน/ยอดไม่ตรง", issShort:"ยอดโอนไม่ครบ (ขาด {n})", issNoLogo:"ยังไม่มีโลโก้", issDup:"การจองซ้ำยังไม่ได้ตรวจ", issSummaryFmt:"ครบ {ok} · ยังไม่ครบ {bad}",
+      errName:"กรุณากรอกชื่อผู้ติดต่อให้ครบ (อย่างน้อย 2 ตัวอักษร)", errShop:"กรุณากรอกชื่อร้าน (อย่างน้อย 2 ตัวอักษร)", errPhone:"กรุณากรอกเบอร์โทรให้ครบ (ตัวเลข 8–15 หลัก)", errEmail:"กรุณากรอกอีเมลให้ถูกต้อง เช่น name@example.com", msPopupTitle:"เลือกไว้แล้ว {n} รายการ", msPopupTotal:"ยอดรวม {total}", msDoBtn:"ทำรายการ", msDoBtnFmt:"ทำรายการ ({n})"
     },
     en: {
       currency:"THB", save:"Save", cancel:"Cancel", close:"Close", edit:"Edit",
@@ -1416,7 +1424,8 @@
       accountNumberCopied:"Account number copied", copyBtn:"Copy", transferToAccount:"Transfer payment to",
       accountNamePrefix:"Account name: ", paymentAccountImgAlt:"Payment account",
       legendFree:"Available", legendPending:"Booked · awaiting slip check", legendConfirmed:"Booked · confirmed", tipPending:"Booked (awaiting check)", tipConfirmed:"Booked (confirmed)", dupTitle:"A booking with the same details already exists", dupSub:"Please choose how to continue", dupFieldsFmt:"Matching details: {fields}", dupField_shop:"shop name", dupField_contact:"contact name", dupField_phone:"phone", dupField_email:"email", dupMoreBtn:"Confirm an additional booking", dupMoreHint:"Book this table in addition to your earlier one. The team checks it against your slip (one slip may cover several tables).", dupChangeBtn:"I want to change my booking", dupChangeHint:"Move your earlier booking to this table. Attach your original slip and enter your original details.", dupBack:"Back to the form", chTitle:"Change my booking", chSub:"Move your booking to the new table — enter your original details and attach your original slip to verify.", chOldTable:"Your current table", chOldTablePh:"e.g. S24", chNewTable:"Move to", chSlipLabel:"Original slip (required)", chSubmit:"Send change request", chNeedSlip:"Please attach your original slip", chNeedOld:"Please enter a valid current table", chSentTitle:"Request sent", chSentBody:"Your details or slip could not be matched automatically. The team will review and get back to you. Your current table is unchanged.", chMovedTitle:"Table changed", chMovedBody:"Your booking moved from table {old} to {new}.", chErrNotFound:"No booking found for that table. Check the table number.", chErrNotAvail:"The new table is no longer available.", chErrTooMany:"Too many requests — please contact the team.", okTitle:"Booking received", okTablesFmt:"Table(s): {ids}", okAmountFmt:"Amount to transfer: {amount}", okSlipSent:"We received your slip — the team will check and confirm.", okSlipLater:"No slip attached yet — please transfer and send your slip to the team to confirm your table.", okSkippedFmt:"Skipped (just booked by someone else): {ids}", okClose:"OK", uploadBadType:"Images only (JPG, PNG, WebP)", uploadTooBigFmt:"File too large (max {mb} MB)", logoHint:"JPG / PNG / WebP · at least 1240×1748 px recommended for A6 printing", logoOkFmt:"✓ Logo {w}×{h} px — enough for A6 printing", logoLowFmt:"Logo {w}×{h} px is below the recommended size for A6 printing (1240×1748 px) — you can still send it, but the print may look soft.", dupBadgeFmt:"Duplicate of {tables}", dupBadgeConfirmed:"customer confirmed extra", dupBadgeUnconfirmed:"not confirmed", changesSectionTitle:"Booking change requests", changesEmpty:"No change requests yet", changeAuto:"moved automatically", changeApprove:"Approve & move", changeReject:"Reject", changeApproved:"approved", changeRejected:"rejected", changePending:"pending", changeDecided:"Request updated", changeFailed:"Could not apply (the new table may be taken)", chkData:"details match", chkSlip:"slip QR matches", chkPrice:"same price", changeSlipFile:"view attached slip", slipLinkLabel:"Use this slip for more tables too (comma separated, e.g. S24, S25)", slipLinkBtn:"Link slip to these tables", slipLinked:"Slip linked",
-      chkOk:"Complete", chkWarnTitle:"Incomplete", issNoSlip:"no slip yet", issSlipUnchecked:"slip not verified yet", issSlipBad:"slip rejected / amount mismatch", issShort:"paid amount short by {n}", issNoLogo:"no logo yet", issDup:"duplicate booking not reviewed", issSummaryFmt:"complete {ok} · incomplete {bad}"
+      chkOk:"Complete", chkWarnTitle:"Incomplete", issNoSlip:"no slip yet", issSlipUnchecked:"slip not verified yet", issSlipBad:"slip rejected / amount mismatch", issShort:"paid amount short by {n}", issNoLogo:"no logo yet", issDup:"duplicate booking not reviewed", issSummaryFmt:"complete {ok} · incomplete {bad}",
+      errName:"Please enter the contact's full name (at least 2 characters)", errShop:"Please enter the shop name (at least 2 characters)", errPhone:"Please enter a complete phone number (8–15 digits)", errEmail:"Please enter a valid email, e.g. name@example.com", msPopupTitle:"{n} item(s) selected", msPopupTotal:"Total {total}", msDoBtn:"Continue", msDoBtnFmt:"Continue ({n})"
     },
     zh: {
       currency:"泰铢", save:"保存", cancel:"取消", close:"关闭", edit:"编辑",
@@ -1511,6 +1520,7 @@
       scriptUrlNotSet:"尚未设置 SUPABASE_URL — 使用前请先在 index.html 中修改此值",
       accountNumberCopied:"账户号码已复制", copyBtn:"复制", transferToAccount:"转账至以下账户",
       accountNamePrefix:"账户名称：", paymentAccountImgAlt:"收款账户",
+      errName:"请填写完整的联系人姓名（至少2个字符）", errShop:"请填写店名（至少2个字符）", errPhone:"请填写完整电话号码（8–15位数字）", errEmail:"请填写有效邮箱，如 name@example.com", msPopupTitle:"已选 {n} 项", msPopupTotal:"合计 {total}", msDoBtn:"办理", msDoBtnFmt:"办理（{n}）",
       chkOk:"资料齐全", chkWarnTitle:"资料未齐", issNoSlip:"尚无凭证", issSlipUnchecked:"凭证未核实", issSlipBad:"凭证未通过/金额不符", issShort:"转账金额不足（差 {n}）", issNoLogo:"尚无 Logo", issDup:"重复预订未核对", issSummaryFmt:"齐全 {ok} · 未齐 {bad}",
       legendFree:"空位", legendPending:"已订 · 待审核凭证", legendConfirmed:"已订 · 已确认", tipPending:"已订（待审核）", tipConfirmed:"已订（已确认）", dupTitle:"系统中已有相同信息的预订", dupSub:"请选择如何继续", dupFieldsFmt:"重复的信息：{fields}", dupField_shop:"店名", dupField_contact:"联系人", dupField_phone:"电话", dupField_email:"邮箱", dupMoreBtn:"确认追加预订", dupMoreHint:"在原有预订之外追加此桌，团队会核对凭证（一张凭证可支付多张桌）", dupChangeBtn:"我要更改预订", dupChangeHint:"将原预订改到此桌，需附原凭证并填写原信息", dupBack:"返回修改", chTitle:"更改预订", chSub:"将原预订改到新桌 — 请填写原信息并附原凭证以便核对", chOldTable:"原预订的桌号", chOldTablePh:"例如 S24", chNewTable:"改到新桌", chSlipLabel:"原凭证（必填）", chSubmit:"提交更改请求", chNeedSlip:"请附上原凭证", chNeedOld:"请填写有效的原桌号", chSentTitle:"请求已提交", chSentBody:"信息或凭证未能自动匹配，团队将审核并回复。原桌位保持不变。", chMovedTitle:"更改成功", chMovedBody:"预订已从 {old} 号桌改到 {new} 号桌", chErrNotFound:"未找到该桌的预订，请检查桌号", chErrNotAvail:"新桌已被预订", chErrTooMany:"请求过多，请联系团队", okTitle:"预订成功", okTablesFmt:"桌号：{ids}", okAmountFmt:"应转账金额：{amount}", okSlipSent:"已收到凭证，团队将审核并确认", okSlipLater:"尚未附凭证，请转账并将凭证发给团队以确认桌位", okSkippedFmt:"未预订成功（刚被他人订走）：{ids}", okClose:"好的", uploadBadType:"仅支持图片（JPG、PNG、WebP）", uploadTooBigFmt:"文件过大（最大 {mb} MB）", logoHint:"支持 JPG / PNG / WebP · A6 印刷建议至少 1240×1748 像素", logoOkFmt:"✓ Logo {w}×{h} 像素 — 满足 A6 印刷", logoLowFmt:"Logo {w}×{h} 像素低于 A6 印刷建议尺寸（1240×1748）— 仍可提交，但印刷可能不够清晰", dupBadgeFmt:"与 {tables} 重复", dupBadgeConfirmed:"客户确认追加", dupBadgeUnconfirmed:"未确认", changesSectionTitle:"预订更改请求", changesEmpty:"暂无更改请求", changeAuto:"已自动更改", changeApprove:"批准并更改", changeReject:"拒绝", changeApproved:"已批准", changeRejected:"已拒绝", changePending:"待处理", changeDecided:"请求已处理", changeFailed:"处理失败（新桌可能已被订）", chkData:"信息匹配", chkSlip:"凭证二维码匹配", chkPrice:"价格相同", changeSlipFile:"查看附件凭证", slipLinkLabel:"此凭证同时用于其他桌（逗号分隔，如 S24, S25）", slipLinkBtn:"将凭证关联到这些桌", slipLinked:"已关联凭证"
     }
@@ -1631,7 +1641,10 @@
       var t = tables[id];
       return sum + (t ? zonePrice(t) : 0);
     }, 0);
-    $("msbInfo").textContent = t("multiSelectInfoFmt", {n: selectedTableIds.length, total: fmtPrice(total)});
+    $("msbTitle").textContent = t("msPopupTitle", {n: selectedTableIds.length});
+    $("msbTotal").textContent = t("msPopupTotal", {total: fmtPrice(total)});
+    $("msbChips").innerHTML = selectedTableIds.map(function(id){ return '<span class="msb-chip">'+esc(id)+'</span>'; }).join("");
+    $("btnMsBook").textContent = t("msDoBtnFmt", {n: selectedTableIds.length});
   }
   function allReady(){ return readyFlags.zones && readyFlags.tables && readyFlags.bookings && readyFlags.config && readyFlags.customFields; }
 
@@ -2791,6 +2804,18 @@
 
   // Opens the same booking sheet, but in multi-table mode: one shop/contact
   // form covering every currently-selected, still-free table at once.
+  var CONTACT_FIELDS_ = ["bkShop","bkContact","bkPhone","bkEmail"];
+  function validateContact_(shop, contact, phone, email){
+    var letters = function(v){ return v.replace(/[\s.\-_'"()]/g, "").length; };
+    var digits = phone.replace(/\D/g, "");
+    if (letters(shop) < 2) return { key:"errShop", field:"bkShop" };
+    if (letters(contact) < 2 || /^\d+$/.test(contact.replace(/\s/g, ""))) return { key:"errName", field:"bkContact" };
+    if (digits.length < 8 || digits.length > 15 || /^(\d)\1+$/.test(digits) || /[^\d\s+()\-.]/.test(phone)) return { key:"errPhone", field:"bkPhone" };
+    if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) return { key:"errEmail", field:"bkEmail" };
+    return null;
+  }
+  CONTACT_FIELDS_.forEach(function(id){ var el = $(id); if (el) el.addEventListener("input", function(){ el.classList.remove("is-invalid"); }); });
+
   function openMultiBookingSheet_(){
     var ids = selectedTableIds.filter(function(id){ return tables[id] && !bookings[id]; });
     if (!ids.length){ toast(t("selectAtLeastOneTable")); return; }
@@ -2873,6 +2898,8 @@
         line = $("bkLine").value.trim(), category = $("bkCategory").value,
         note = $("bkNote").value.trim(), hasPower = $("bkPower").checked;
     if (!shop || !contact || !phone || !email){ $("bkErr").textContent = t("fillAllFields"); return; }
+    var vErr = validateContact_(shop, contact, phone, email);
+    if (vErr){ $("bkErr").textContent = t(vErr.key); var bad = $(vErr.field); if (bad){ bad.classList.add("is-invalid"); bad.focus(); } return; }
     var missingCustom = validateCustomRequired_("bk");
     if (missingCustom){ $("bkErr").textContent = t("pleaseEnterFmt", {field: missingCustom}); return; }
     var runSubmit_ = function(dupConfirmed){

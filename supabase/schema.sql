@@ -109,6 +109,14 @@ begin
      or coalesce(btrim(p_data->>'phone'), '') = '' or coalesce(btrim(p_data->>'email'), '') = '' then
     raise exception 'missing required fields';
   end if;
+  if length(regexp_replace(p_data->>'shop', '[\s.\-_''"()]', '', 'g')) < 2
+     or length(regexp_replace(p_data->>'contact', '[\s.\-_''"()]', '', 'g')) < 2
+     or regexp_replace(p_data->>'contact', '\s', '', 'g') ~ '^\d+$'
+     or length(regexp_replace(p_data->>'phone', '\D', '', 'g')) not between 8 and 15
+     or (p_data->>'phone') ~ '[^0-9\s+()\-.]'
+     or btrim(p_data->>'email') !~ '^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$' then
+    raise exception 'invalid contact details';
+  end if;
   slip := public._clean_file(p_data->'slipData');
   logo := public._clean_file(p_data->'logoData');
   custom := case when jsonb_typeof(p_data->'custom') = 'object' and length((p_data->'custom')::text) <= 4000
