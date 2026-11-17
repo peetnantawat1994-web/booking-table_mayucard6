@@ -515,6 +515,7 @@
 </script>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
 
 <div class="shell">
@@ -599,8 +600,12 @@
     <h3 data-i18n="loginTitle">เข้าสู่ระบบแอดมิน</h3>
     <div class="sheet-sub" data-i18n="loginSub">สำหรับทีมงานจัดงานเท่านั้น</div>
     <div class="field">
+      <label for="loginEmail" data-i18n="labelEmail">อีเมล</label>
+      <input type="email" id="loginEmail" autocomplete="username" />
+    </div>
+    <div class="field">
       <label for="loginPw" data-i18n="labelPassword">รหัสผ่าน</label>
-      <input type="password" id="loginPw" placeholder="••••••••" autocomplete="off" />
+      <input type="password" id="loginPw" placeholder="••••••••" autocomplete="current-password" />
     </div>
     <div class="err-text" id="loginErr"></div>
     <div class="sheet-actions">
@@ -920,10 +925,24 @@
   /* =========================================================
      CONSTANTS
   ========================================================= */
-  // ===== self-hosted backend (Google Apps Script Web App) =====
-  // Paste the "Web app" deployment URL from Apps Script here (Deploy > New deployment > Web app).
-  // Looks like: https://script.google.com/macros/s/AKfycb.../exec
-  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWuBZocTo25f4kTVW0_oJ7hnf3clLidUAtQauruui2LQB1_tssrCMQVyjnWf5QJa3WnQ/exec";
+  // ===== backend: Supabase =====
+  // Supabase Dashboard > Project Settings > API: "Project URL" and the
+  // "anon public" key. The anon key is meant to be public: every rule about
+  // who can read or change what lives in the database (supabase/schema.sql).
+  var SUPABASE_URL = "https://fkrqkwlwvwichbygwvrs.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrcnFrd2x3dndpY2hieWd3dnJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5MjgzNDUsImV4cCI6MjExMDUwNDM0NX0.NFYJTf9NFCmHJ5sUVG64lm_L-MMIt-O-igfE3k2n0A4";
+  var UPLOAD_BUCKET = "uploads";
+  // Slips and logos are ALSO copied to Google Drive (the team picks files up
+  // from there). Uses the existing Apps Script "uploadFile" action; if it is
+  // slow or fails the booking still saves, because Supabase is the primary store.
+  var DRIVE_UPLOAD_URL = "https://script.google.com/macros/s/AKfycbwWuBZocTo25f4kTVW0_oJ7hnf3clLidUAtQauruui2LQB1_tssrCMQVyjnWf5QJa3WnQ/exec";
+  var DRIVE_TIMEOUT_MS = 25000;
+  var sb = (window.supabase && SUPABASE_URL.indexOf("PASTE_") !== 0)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        // per-tab admin session, same as before (closing the tab logs out)
+        auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true }
+      })
+    : null;
   var POLL_MS = 10000; // how often (ms) to re-check the sheet for changes from other devices
 
   // ===== preview mode =====
@@ -1160,7 +1179,7 @@
       publishSuccess:"เผยแพร่สำเร็จ — ลูกค้าจะเห็นการเปลี่ยนแปลงทันที", publishFailedPrefix:"เผยแพร่ไม่สำเร็จ: ",
       loginTitle:"เข้าสู่ระบบแอดมิน", loginSub:"สำหรับทีมงานจัดงานเท่านั้น", labelPassword:"รหัสผ่าน",
       loginSubmitBtn:"เข้าสู่ระบบ", pleaseEnterPassword:"กรุณากรอกรหัสผ่าน", wrongPassword:"รหัสผ่านไม่ถูกต้อง",
-      loginConnectFailed:"เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ — ตรวจสอบ SCRIPT_URL", loggedInToast:"เข้าสู่ระบบแอดมินแล้ว",
+      loginConnectFailed:"เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ — ตรวจสอบ SUPABASE_URL", loggedInToast:"เข้าสู่ระบบแอดมินแล้ว",
       zoneFirstGuard:"สร้างโซนก่อนเพิ่มโต๊ะ", tableAddedFmt:"เพิ่มโต๊ะ {id} แล้ว",
       selectAtLeastOneTable:"กรุณาเลือกโต๊ะที่ว่างอย่างน้อย 1 โต๊ะ", previewNoBooking:"นี่คือหน้าพรีวิว — จองจริงไม่ได้",
       tableAlreadyBooked:"โต๊ะนี้ถูกจองไปแล้ว", selectedTablesAllTaken:"โต๊ะที่เลือกไว้ถูกจองไปหมดแล้ว กรุณาเลือกใหม่",
@@ -1169,12 +1188,12 @@
       bookingSkippedFmt:" · ยกเว้น {n} โต๊ะที่เพิ่งถูกจองไปก่อนหน้า ({ids})", bookingSuccessSingleFmt:"จองโต๊ะ {id} สำเร็จ — รอตรวจสอบสลิป",
       tableSavedFmt:"บันทึกโต๊ะ {id} แล้ว", tableDeletedFmt:"ลบโต๊ะ {id} แล้ว", tableReleasedFmt:"ปล่อยโต๊ะ {id} ให้ว่างแล้ว",
       bookingSavedFmt:"บันทึกการจองโต๊ะ {id} แล้ว", tableMovedFmt:"ย้ายโต๊ะจาก {old} ไปที่ {new} สำเร็จ",
-      tableMoveFailed:"ย้ายโต๊ะไม่สำเร็จ ลองใหม่อีกครั้ง", releaseConfirmFmt:"ปล่อยโต๊ะ {id} และลบข้อมูลการจองนี้?", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง",
+      tableMoveFailed:"ย้ายโต๊ะไม่สำเร็จ ลองใหม่อีกครั้ง", releaseConfirmFmt:"ปล่อยโต๊ะ {id} และลบข้อมูลการจองนี้?", supabaseNotSet:"ยังไม่ได้ตั้งค่า Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"บัญชีนี้ไม่ใช่แอดมิน", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง",
       pleaseEnterZoneName:"กรอกชื่อโซน", zoneSaved:"บันทึกโซนแล้ว", zoneDeleteBlocked:"ลบไม่ได้ เพราะยังมีโต๊ะใช้โซนนี้อยู่",
       zoneDeleted:"ลบโซนแล้ว", pleaseEnterFieldName:"กรอกชื่อฟิลด์", pleaseEnterOneOption:"กรอกตัวเลือกอย่างน้อย 1 รายการ",
       fieldSaved:"บันทึกฟิลด์แล้ว", fieldDeleted:"ลบฟิลด์แล้ว", settingsSaved:"บันทึกการตั้งค่าแล้ว",
-      dbConnectFailed:"เชื่อมต่อฐานข้อมูลไม่สำเร็จ — ตรวจสอบ SCRIPT_URL ในไฟล์ index.html",
-      scriptUrlNotSet:"ยังไม่ได้ตั้งค่า SCRIPT_URL — แก้ไขค่านี้ในไฟล์ index.html ก่อนใช้งาน",
+      dbConnectFailed:"เชื่อมต่อฐานข้อมูลไม่สำเร็จ — ตรวจสอบ SUPABASE_URL ในไฟล์ index.html",
+      scriptUrlNotSet:"ยังไม่ได้ตั้งค่า SUPABASE_URL — แก้ไขค่านี้ในไฟล์ index.html ก่อนใช้งาน",
       accountNumberCopied:"คัดลอกเลขบัญชีแล้ว", copyBtn:"คัดลอก", transferToAccount:"โอนเงินมาที่บัญชี",
       accountNamePrefix:"ชื่อบัญชี: ", paymentAccountImgAlt:"บัญชีรับเงิน"
     },
@@ -1243,7 +1262,7 @@
       publishSuccess:"Published — customers will see the changes immediately", publishFailedPrefix:"Publish failed: ",
       loginTitle:"Admin login", loginSub:"For event staff only", labelPassword:"Password",
       loginSubmitBtn:"Log in", pleaseEnterPassword:"Please enter a password", wrongPassword:"Incorrect password",
-      loginConnectFailed:"Could not connect to the server — check SCRIPT_URL", loggedInToast:"Logged in as admin",
+      loginConnectFailed:"Could not connect to the server — check SUPABASE_URL", loggedInToast:"Logged in as admin",
       zoneFirstGuard:"Create a zone before adding a table", tableAddedFmt:"Table {id} added",
       selectAtLeastOneTable:"Please select at least one free table", previewNoBooking:"This is a preview page — you can't make a real booking here",
       tableAlreadyBooked:"This table has already been booked", selectedTablesAllTaken:"All selected tables have been booked — please select again",
@@ -1252,12 +1271,12 @@
       bookingSkippedFmt:" · excluding {n} tables just booked by someone else ({ids})", bookingSuccessSingleFmt:"Table {id} booked — awaiting slip review",
       tableSavedFmt:"Table {id} saved", tableDeletedFmt:"Table {id} deleted", tableReleasedFmt:"Table {id} released",
       bookingSavedFmt:"Booking for table {id} saved", tableMovedFmt:"Moved booking from table {old} to {new}",
-      tableMoveFailed:"Could not move the table — please try again", releaseConfirmFmt:"Release table {id} and delete this booking?", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet",
+      tableMoveFailed:"Could not move the table — please try again", releaseConfirmFmt:"Release table {id} and delete this booking?", supabaseNotSet:"Supabase is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"This account is not an admin", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet",
       pleaseEnterZoneName:"Please enter a zone name", zoneSaved:"Zone saved", zoneDeleteBlocked:"Can't delete — some tables still use this zone",
       zoneDeleted:"Zone deleted", pleaseEnterFieldName:"Please enter a field name", pleaseEnterOneOption:"Please enter at least one option",
       fieldSaved:"Field saved", fieldDeleted:"Field deleted", settingsSaved:"Settings saved",
-      dbConnectFailed:"Could not connect to the database — check SCRIPT_URL in index.html",
-      scriptUrlNotSet:"SCRIPT_URL isn't set yet — edit this value in index.html before using the page",
+      dbConnectFailed:"Could not connect to the database — check SUPABASE_URL in index.html",
+      scriptUrlNotSet:"SUPABASE_URL isn't set yet — edit this value in index.html before using the page",
       accountNumberCopied:"Account number copied", copyBtn:"Copy", transferToAccount:"Transfer payment to",
       accountNamePrefix:"Account name: ", paymentAccountImgAlt:"Payment account"
     },
@@ -1326,7 +1345,7 @@
       publishSuccess:"发布成功 — 顾客将立即看到更改", publishFailedPrefix:"发布失败：",
       loginTitle:"管理员登录", loginSub:"仅限活动工作人员使用", labelPassword:"密码",
       loginSubmitBtn:"登录", pleaseEnterPassword:"请输入密码", wrongPassword:"密码错误",
-      loginConnectFailed:"无法连接服务器 — 请检查 SCRIPT_URL", loggedInToast:"已登录管理员账户",
+      loginConnectFailed:"无法连接服务器 — 请检查 SUPABASE_URL", loggedInToast:"已登录管理员账户",
       zoneFirstGuard:"请先建立分区，再新增桌位", tableAddedFmt:"已新增 {id} 号桌",
       selectAtLeastOneTable:"请至少选择一个空桌", previewNoBooking:"这是预览页面 — 无法进行实际预订",
       tableAlreadyBooked:"该桌位已被预订", selectedTablesAllTaken:"所选的桌位都已被预订，请重新选择",
@@ -1335,12 +1354,12 @@
       bookingSkippedFmt:" · 不含刚被他人预订的 {n} 桌（{ids}）", bookingSuccessSingleFmt:"{id} 号桌预订成功 — 待审核凭证",
       tableSavedFmt:"{id} 号桌已保存", tableDeletedFmt:"{id} 号桌已删除", tableReleasedFmt:"{id} 号桌已释放",
       bookingSavedFmt:"{id} 号桌的预订已保存", tableMovedFmt:"已将预订从 {old} 号桌移至 {new} 号桌",
-      tableMoveFailed:"更换桌位失败，请重试", releaseConfirmFmt:"释放 {id} 号桌并删除此预订？", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订",
+      tableMoveFailed:"更换桌位失败，请重试", releaseConfirmFmt:"释放 {id} 号桌并删除此预订？", supabaseNotSet:"尚未配置 Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"此账号不是管理员", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订",
       pleaseEnterZoneName:"请输入分区名称", zoneSaved:"分区已保存", zoneDeleteBlocked:"无法删除，仍有桌位使用此分区",
       zoneDeleted:"分区已删除", pleaseEnterFieldName:"请输入字段名称", pleaseEnterOneOption:"请至少输入一个选项",
       fieldSaved:"字段已保存", fieldDeleted:"字段已删除", settingsSaved:"设置已保存",
-      dbConnectFailed:"无法连接数据库 — 请检查 index.html 中的 SCRIPT_URL",
-      scriptUrlNotSet:"尚未设置 SCRIPT_URL — 使用前请先在 index.html 中修改此值",
+      dbConnectFailed:"无法连接数据库 — 请检查 index.html 中的 SUPABASE_URL",
+      scriptUrlNotSet:"尚未设置 SUPABASE_URL — 使用前请先在 index.html 中修改此值",
       accountNumberCopied:"账户号码已复制", copyBtn:"复制", transferToAccount:"转账至以下账户",
       accountNamePrefix:"账户名称：", paymentAccountImgAlt:"收款账户"
     }
@@ -1383,9 +1402,18 @@
   // backed translateBatch action) and gets back [{th,en,zh}, ...] in the
   // same order — used right before saving admin-edited text so the
   // EN/ZH versions are ready the moment the page re-renders.
+  function _knownTranslation_(text){
+    var found = null;
+    (function walk(v){
+      if (found || !v || typeof v !== "object") return;
+      if (typeof v.th === "string" && v.th === text && (v.en || v.zh)){ found = v; return; }
+      Object.keys(v).forEach(function(k){ walk(v[k]); });
+    })([config, zones, customFields]);
+    return found ? { th: found.th, en: found.en || found.th, zh: found.zh || found.th } : { th: text };
+  }
   function translateBatch_(texts){
     if (!texts.length) return Promise.resolve([]);
-    return _dbCall("translateBatch", { texts: texts }).then(function(res){ return res.items || []; });
+    return Promise.resolve(texts.map(_knownTranslation_));
   }
 
   function applyI18n_(){
@@ -1554,21 +1582,65 @@
       if (!m) return Promise.resolve();
       return _dbCall("uploadFile", { mime:m[1], base64:m[2], kind:t.kind }).then(function(res){
         if (res && res.url) t.parent[t.key] = res.url;
+        if (res && res.driveUrl) t.parent.driveUrl = res.driveUrl;
       });
     })).then(function(){ return clone; });
   }
 
+  function _rpc(fn, args){
+    if (!sb) return Promise.reject(new Error("supabase not configured"));
+    return sb.rpc(fn, args || {}).then(function(r){
+      if (r.error) throw new Error(r.error.message || (fn + " failed"));
+      return r.data;
+    });
+  }
+  function _uploadToStorage_(p){
+    if (!sb) return Promise.reject(new Error("supabase not configured"));
+    var bin = atob(p.base64), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var mime = p.mime || "image/jpeg";
+    var ext = /png/.test(mime) ? "png" : /webp/.test(mime) ? "webp" : /gif/.test(mime) ? "gif" : "jpg";
+    var kind = (p.kind === "slip" || p.kind === "logo") ? p.kind : "other";
+    var rand = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
+    var path = kind + "/" + rand + "." + ext;
+    var drive = _uploadToDrive_({ mime: mime, base64: p.base64, kind: kind });   // runs in parallel
+    var store = sb.storage.from(UPLOAD_BUCKET).upload(path, new Blob([bytes], { type: mime }), { contentType: mime, upsert: false })
+      .then(function(r){
+        if (r.error) throw new Error(r.error.message || "upload failed");
+        return sb.storage.from(UPLOAD_BUCKET).getPublicUrl(path).data.publicUrl;
+      });
+    return Promise.all([store, drive]).then(function(res){
+      return { ok: true, url: res[0], driveUrl: res[1] || null };
+    });
+  }
+  // Best effort: resolves to the Drive URL, or null on any problem.
+  function _uploadToDrive_(p){
+    if (!DRIVE_UPLOAD_URL) return Promise.resolve(null);
+    var timeout = new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, DRIVE_TIMEOUT_MS); });
+    var call = fetch(DRIVE_UPLOAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },   // avoids a CORS preflight against Apps Script
+      body: JSON.stringify({ action: "uploadFile", payload: { mime: p.mime, base64: p.base64, kind: p.kind } })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      return (j && j.ok && /^https:\/\//.test(j.url || "")) ? j.url : null;
+    }).catch(function(){ return null; });
+    return Promise.race([call, timeout]);
+  }
+  // Same action names the rest of this file has always used; only the
+  // transport changed (Apps Script POST -> Supabase RPC / Storage).
   function _dbCall(action, payload){
     payload = payload || {};
-    if (adminToken) payload.token = adminToken;
-    return fetch(SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight against Apps Script
-      body: JSON.stringify({ action:action, payload:payload })
-    }).then(function(res){ return res.json(); }).then(function(json){
-      if (!json || !json.ok) throw new Error((json && json.error) || (action+" failed"));
-      return json;
-    });
+    switch (action){
+      case "setDoc":    return _rpc("admin_set_doc", { p_store: payload.store || "draft", p_path: payload.path, p_data: payload.data, p_merge: false });
+      case "updateDoc": return _rpc("admin_set_doc", { p_store: payload.store || "draft", p_path: payload.path, p_data: payload.patch, p_merge: true });
+      case "deleteDoc": return _rpc("admin_delete_doc", { p_store: payload.store || "draft", p_path: payload.path });
+      case "createBooking":      return _rpc("create_booking", { p_table_id: payload.tableId, p_data: payload.data });
+      case "createBookingMulti": return _rpc("create_booking_multi", { p_items: payload.bookings });
+      case "publishDraft":       return _rpc("publish_draft");
+      case "uploadFile":         return _uploadToStorage_(payload);
+      case "translateBatch":     return Promise.resolve({ ok: true, items: (payload.texts || []).map(_knownTranslation_) });
+      default: return Promise.reject(new Error("unknown action: " + action));
+    }
   }
 
   function _dbApplyWriteLocal(path, data, mode){
@@ -1642,7 +1714,7 @@
   function createBookingPublic(tableId, data){
     return _dbUploadEmbedded(data).then(function(clean){
       return _dbCall("createBooking", { tableId: tableId, data: clean }).then(function(res){
-        _dbApplyWriteLocal("bookings/"+tableId, clean, "set");
+        _dbApplyWriteLocal("bookings/"+tableId, (res && res.booking) || clean, "set");
         return res;
       });
     });
@@ -1662,7 +1734,7 @@
     return _dbCall("createBookingMulti", { bookings: items }).then(function(res){
       items.forEach(function(item){
         if (res.booked && res.booked.indexOf(item.tableId) > -1){
-          _dbApplyWriteLocal("bookings/"+item.tableId, item.data, "set");
+          _dbApplyWriteLocal("bookings/"+item.tableId, (res.bookings && res.bookings[item.tableId]) || item.data, "set");
         }
       });
       return res;
@@ -1673,30 +1745,13 @@
     return (isAdmin && adminToken) || _previewToken || null;
   }
 
-  var _draftBookingsRaw = {}; // what the draft store holds for bookings (stale copy), see fetchAll
   function fetchAll(){
     var draftToken = _draftReadToken();
-    var action = draftToken ? "getAllDraft" : "getAll";
-    var url = SCRIPT_URL + (SCRIPT_URL.indexOf("?") > -1 ? "&" : "?") + "action=" + action +
-      (draftToken ? "&token=" + encodeURIComponent(draftToken) : "");
-    // Bookings are live operational data, not part of the admin's layout
-    // draft: customers always book straight into live, so the draft's copy
-    // is a stale snapshot from the last publish. While reading the draft we
-    // also fetch live and take bookings from there.
-    var liveUrl = SCRIPT_URL + (SCRIPT_URL.indexOf("?") > -1 ? "&" : "?") + "action=getAll";
-    var liveP = draftToken
-      ? fetch(liveUrl, { cache:"no-store" }).then(function(r){ return r.json(); }).catch(function(){ return null; })
-      : Promise.resolve(null);
-    return Promise.all([fetch(url, { cache:"no-store" }).then(function(res){ return res.json(); }), liveP])
-      .then(function(both){
-        var json = both[0], live = both[1];
-        if (!json || !json.ok) throw new Error((json && json.error) || (action+" failed"));
-        var d = json.data || {};
-        if (draftToken){
-          if (!live || !live.ok) throw new Error((live && live.error) || "getAll failed");
-          _draftBookingsRaw = d.bookings || {};
-          d.bookings = (live.data && live.data.bookings) || {};
-        }
+    // admin: draft layout + LIVE bookings with contact details (needs login)
+    // everyone else: live layout + which tables are taken, no contact details
+    return _rpc(draftToken ? "get_admin_state" : "get_public_state")
+      .then(function(d){
+        d = d || {};
         ["zones","tables","bookings"].forEach(function(col){
           var incoming = d[col] || {};
           var changed = !_dbEverLoaded || JSON.stringify(incoming) !== JSON.stringify(_dbCache[col]);
@@ -1716,9 +1771,7 @@
       })
       .catch(function(err){
         console.error("mayucard6: fetchAll failed", err);
-        // an expired admin token (backend keeps it 6 h) used to fail silently,
-        // leaving the admin looking at stale or empty data
-        if (isAdmin && /not authorized/i.test(String(err && err.message))){
+        if (isAdmin && /not authorized|permission denied|jwt|token/i.test(String(err && err.message))){
           toast(t("sessionExpired"));
           logout();
           return;
@@ -1728,9 +1781,7 @@
   }
 
   function initDb(){
-    if (!SCRIPT_URL || SCRIPT_URL.indexOf("PASTE_") === 0){
-      toast(t("scriptUrlNotSet"));
-    }
+    if (!sb){ toast(t("supabaseNotSet")); }
     subscribe();       // register listeners first, same as before
     fetchAll();        // then do the first load
     setInterval(fetchAll, POLL_MS); // and keep polling so other devices' changes show up here
@@ -1830,49 +1881,21 @@
     if (!db) return Promise.reject();
     return db.doc("zones/"+key).delete();
   }
-  // A booking change (status -> paid, edits, release) must reach customers
-  // immediately, not wait for "publish". So it is written to live, and the
-  // same record is copied into the draft so a later publish (which copies
-  // every draft booking onto live) can't roll it back.
+  // Bookings are never part of the draft: a status change, edit or release
+  // reaches customers immediately (the database forces bookings to live).
   function saveBooking(tableId, data){
     var path = "bookings/"+tableId;
     return _dbUploadEmbedded(data).then(function(clean){
       return _dbCall("setDoc", { path:path, data:clean, store:"live" }).then(function(){
         _dbApplyWriteLocal(path, clean, "set");
-        _draftBookingsRaw[tableId] = clean;
-        if (!isAdmin) return;
-        return _dbCall("setDoc", { path:path, data:clean, store:"draft" }).catch(function(e){
-          console.warn("mayucard6: draft mirror failed (fixed on next publish)", e);
-        });
       });
     });
   }
-  // Delete from live only. The draft copy is cleaned up right before the
-  // next publish (syncDraftBookings_), not now: deleting in the draft leaves
-  // a "tombstone" that would also wipe out a NEW customer booking made on
-  // the same table between now and that publish.
   function deleteBooking(tableId){
     var path = "bookings/"+tableId;
     return _dbCall("deleteDoc", { path:path, store:"live" }).then(function(){
       _dbApplyWriteLocal(path, null, "delete");
     });
-  }
-  // Make the draft's bookings equal live's before publishing, so publish
-  // never resurrects a released booking or reverts a status change.
-  function syncDraftBookings_(){
-    var live = _dbCache.bookings || {}, draft = _draftBookingsRaw || {};
-    var ops = [];
-    Object.keys(draft).forEach(function(id){
-      if (!live[id]) ops.push({ action:"deleteDoc", payload:{ path:"bookings/"+id, store:"draft" } });
-    });
-    Object.keys(live).forEach(function(id){
-      if (draft[id] && JSON.stringify(draft[id]) !== JSON.stringify(live[id])){
-        ops.push({ action:"setDoc", payload:{ path:"bookings/"+id, data:live[id], store:"draft" } });
-      }
-    });
-    return ops.reduce(function(chain, op){
-      return chain.then(function(){ return _dbCall(op.action, op.payload); });
-    }, Promise.resolve());
   }
   function saveConfig(patch){
     if (!db) return Promise.reject();
@@ -2042,7 +2065,7 @@
   });
   function publishNow(){
     if (!confirm(t("publishConfirm"))) return;
-    return syncDraftBookings_().then(function(){ return _dbCall("publishDraft", {}); }).then(function(){
+    return _dbCall("publishDraft", {}).then(function(){
       toast(t("publishSuccess"));
       fetchAll(); // our own draft view now equals the freshly-published live state
       if (!$("previewOverlay").hidden) $("previewIframe").src = previewUrl();
@@ -2672,6 +2695,8 @@
     // "open" link is only offered for files that already live on Drive
     var openLink = /^https:/i.test(url)
       ? ' <a href="'+url+'" target="_blank" rel="noopener noreferrer">'+esc(t("openFullSize"))+'</a>' : '';
+    var dUrl = safeUrl_(f.driveUrl);
+    if (/^https:/i.test(dUrl)) openLink += ' · <a href="'+dUrl+'" target="_blank" rel="noopener noreferrer">Drive</a>';
     return '<div class="file-row"><div class="file-thumb">'+thumb+'</div>'+
       '<div class="file-info"><b>'+esc(f.filename||t("uploadedFile"))+'</b>'+esc(t("fileAttachedHint"))+openLink+'</div></div>';
   }
@@ -3123,39 +3148,44 @@
   $("btnLoginCancel").addEventListener("click", function(){ closeSheet("scrimLogin"); });
   $("scrimLogin").addEventListener("click", function(e){ if (e.target.id==="scrimLogin") closeSheet("scrimLogin"); });
   function doLogin(){
+    var email = $("loginEmail").value.trim();
     var pw = $("loginPw").value;
-    if (!pw){ $("loginErr").textContent = t("pleaseEnterPassword"); return; }
+    if (!email || !pw){ $("loginErr").textContent = t("pleaseEnterPassword"); return; }
+    if (!sb){ $("loginErr").textContent = t("supabaseNotSet"); return; }
     $("btnLoginSubmit").disabled = true;
     $("loginErr").textContent = "";
-    fetch(SCRIPT_URL, {
-      method: "POST",
-      headers: {"Content-Type": "text/plain;charset=utf-8"},
-      body: JSON.stringify({action:"login", payload:{password: pw}})
-    }).then(function(res){ return res.json(); }).then(function(json){
+    sb.auth.signInWithPassword({ email: email, password: pw }).then(function(r){
+      if (r.error || !r.data || !r.data.session) throw { wrong: true };
+      // a valid account is not enough: it must be listed in the admins table
+      return _rpc("is_admin").then(function(ok){
+        if (!ok){ return sb.auth.signOut().then(function(){ throw { notAdmin: true }; }); }
+        return r.data.session;
+      });
+    }).then(function(session){
       $("btnLoginSubmit").disabled = false;
-      if (json && json.ok && json.token){
-        isAdmin = true;
-        adminToken = json.token;
-        _dbWriteStore = "draft";
-        try{
-          sessionStorage.setItem(ADMIN_FLAG_KEY, "1");
-          sessionStorage.setItem(ADMIN_TOKEN_KEY, adminToken);
-        }catch(e){}
-        closeSheet("scrimLogin");
-        toast(t("loggedInToast"));
-        fetchAll(); // switch over to reading the draft right away, don't wait for the next poll
-        render();
-      } else {
-        $("loginErr").textContent = t("wrongPassword");
-      }
-    }).catch(function(){
+      $("loginPw").value = "";
+      isAdmin = true;
+      adminToken = session.access_token;
+      _dbWriteStore = "draft";
+      try{
+        sessionStorage.setItem(ADMIN_FLAG_KEY, "1");
+        sessionStorage.setItem(ADMIN_TOKEN_KEY, "supabase");
+      }catch(e){}
+      closeSheet("scrimLogin");
+      toast(t("loggedInToast"));
+      fetchAll(); // switch over to reading the draft right away, don't wait for the next poll
+      render();
+    }).catch(function(e){
+      if (!(e && (e.notAdmin || e.wrong))) console.error("mayucard6: login failed", e);
       $("btnLoginSubmit").disabled = false;
-      $("loginErr").textContent = t("loginConnectFailed");
+      $("loginErr").textContent = (e && e.notAdmin) ? t("notAdminAccount")
+        : (e && e.wrong) ? t("wrongPassword") : t("loginConnectFailed");
     });
   }
   $("btnLoginSubmit").addEventListener("click", doLogin);
   $("loginPw").addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(); });
   function logout(){
+    if (sb) sb.auth.signOut().catch(function(){});
     isAdmin = false; adminMode = "preview"; adminToken = null; frontDeskMode = false;
     _dbWriteStore = "live";
     try{
@@ -3207,6 +3237,13 @@
   if (_isPreviewFrame){
     $("adminTrigger").style.display = "none"; // no admin login from inside an embedded preview
     document.title = t("previewTitlePrefix") + document.title;
+  }
+  if (sb && (isAdmin || _isPreviewFrame)){
+    sb.auth.getSession().then(function(r){
+      var session = r && r.data && r.data.session;
+      if (!session){ if (isAdmin) logout(); return; }
+      if (isAdmin) adminToken = session.access_token;
+    });
   }
   initDb();
 })();

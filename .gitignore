@@ -3,3 +3,6 @@ supabase/seed-data.sql
 .DS_Store
 ._*
 node_modules/
+supabase/.temp/
+supabase/migration*.sql
+*uploads-map*.json
