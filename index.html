@@ -429,6 +429,8 @@
   }
   .status-badge.st-pending{background:var(--warn-soft); color:var(--warn);}
   .status-badge.st-paid{background:var(--accent-soft); color:var(--accent);}
+  .status-badge.st-warn{background:var(--warn-soft); color:var(--warn); font-weight:800; cursor:help;}
+  .status-badge.st-done{background:var(--good-soft); color:var(--good); font-weight:800;}
   .status-badge.st-confirmed{background:var(--good-soft); color:var(--good);}
   .status-badge.st-cancelled{background:var(--bad-soft); color:var(--bad);}
 
@@ -469,6 +471,25 @@
   .file-row .file-info b{display:block; font-size:13px; color:var(--ink); font-weight:600;}
   .file-replace{font-size:12px; color:var(--ink-soft); margin-top:5px;}
 
+  /* map: booked tables are dark grey — striped = awaiting slip check, solid dark + tick = confirmed/paid */
+  .tbl.is-booked.is-pending, .table-btn.is-booked.is-pending{background:repeating-linear-gradient(135deg,#7b818b 0 5px,#5e646e 5px 10px); border-color:#3b4048; color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);}
+  .tbl.is-booked.is-confirmed, .table-btn.is-booked.is-confirmed{background:#262a31; border-color:#0e1013; color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);}
+  .tbl.is-booked.is-pending:hover, .table-btn.is-booked.is-pending:hover{background:repeating-linear-gradient(135deg,#868c96 0 5px,#69707a 5px 10px);}
+  .tbl.is-booked.is-confirmed:hover, .table-btn.is-booked.is-confirmed:hover{background:#343942;}
+  .tbl.is-booked.is-confirmed::after{content:"✓"; position:absolute; right:1px; top:-1px; font-size:8px; line-height:1; color:#8ee0a6;}
+  .status-legend{display:flex; flex-wrap:wrap; gap:6px 16px; margin:0 0 12px; font-size:12px; color:var(--ink-soft);}
+  .status-legend .sw{display:inline-block; width:14px; height:14px; border-radius:3px; vertical-align:-3px; margin-right:6px; border:1.5px solid;}
+  .sw-free{background:color-mix(in srgb,#34c759 22%,transparent); border-color:#34c759;}
+  .sw-pending{background:repeating-linear-gradient(135deg,#7b818b 0 3px,#5e646e 3px 6px); border-color:#3b4048;}
+  .sw-confirmed{background:#262a31; border-color:#0e1013;}
+  .dup-opt{margin-top:12px;} .dup-opt .btn{margin-bottom:5px;} .dup-hint{font-size:12px; color:var(--ink-soft); line-height:1.4; margin-bottom:8px;}
+  .dup-fields{font-size:13px; font-weight:600; color:var(--warn); margin:6px 0 2px;}
+  .ok-hero{text-align:center; padding:6px 0 2px;} .ok-hero .ok-ic{width:54px; height:54px; border-radius:50%; background:var(--good-soft); color:var(--good); font-size:30px; line-height:54px; margin:0 auto 8px; font-weight:700;}
+  .ok-lines{font-size:14px; line-height:1.6; text-align:center; margin:4px 0 6px;} .ok-lines .ok-note{font-size:12.5px; color:var(--ink-soft);}
+  .chg-row{border:1px solid var(--line); border-radius:var(--r-sm); padding:9px 11px; margin-bottom:8px; background:var(--surface);}
+  .chg-head{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-weight:600;} .chg-meta{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+  .chg-checks span{margin-right:10px; font-size:12px;} .chg-yes{color:var(--good);} .chg-no{color:var(--bad);}
+  .chg-actions{display:flex; gap:8px; margin-top:8px;}
   .slip-scan{font-size:12.5px; margin-top:7px; color:var(--ink-soft); line-height:1.4;}
   .slip-scan.ok{color:var(--good);} .slip-scan.warn{color:var(--warn);}
   .slip-card{border:1px solid var(--line); border-radius:var(--r-md); padding:12px; margin-top:10px; background:var(--surface-2);}
@@ -554,6 +575,11 @@
 
   <div class="stat-row" id="statRow"></div>
   <div class="legend" id="legend"></div>
+  <div class="status-legend" id="statusLegend">
+    <span><i class="sw sw-free"></i><span data-i18n="legendFree">ว่าง</span></span>
+    <span><i class="sw sw-pending"></i><span data-i18n="legendPending">จองแล้ว · รอตรวจสอบสลิป</span></span>
+    <span><i class="sw sw-confirmed"></i><span data-i18n="legendConfirmed">จองแล้ว · ยืนยันแล้ว</span></span>
+  </div>
 
   <div id="adminBar" hidden></div>
 
@@ -590,6 +616,11 @@
   </div>
   <div class="section-hint" id="slipsSectionHint" hidden data-i18n="slipsHint"></div>
   <div id="slipsPanel" hidden></div>
+
+  <div class="section-head" id="changesSectionHead" hidden>
+    <h2 data-i18n="changesSectionTitle">คำขอเปลี่ยนแปลงการจอง</h2>
+  </div>
+  <div id="changesPanel" hidden></div>
 
   <div class="section-head" id="zonesSectionHead" hidden>
     <h2 id="zonesSectionTitle">จัดการโซน</h2>
@@ -672,7 +703,7 @@
         <label data-i18n="labelSlipOptional">สลิปโอนเงิน (ไม่บังคับ — แนบได้ทีหลัง)</label>
         <div class="logo-pick">
           <div class="preview" id="bkSlipPreview">SLIP</div>
-          <input type="file" id="bkSlipFile" accept="image/*" />
+          <input type="file" id="bkSlipFile" accept="image/jpeg,image/png,image/webp,image/gif" />
         </div>
         <div class="slip-scan" id="bkSlipScan" aria-live="polite"></div>
       </div>
@@ -680,8 +711,9 @@
         <label data-i18n="labelLogoOptional">โลโก้ร้าน (ไม่บังคับ)</label>
         <div class="logo-pick">
           <div class="preview" id="bkLogoPreview">LOGO</div>
-          <input type="file" id="bkLogoFile" accept="image/*" />
+          <input type="file" id="bkLogoFile" accept="image/jpeg,image/png,image/webp,image/gif" />
         </div>
+        <div class="slip-scan" id="bkLogoNote" data-i18n="logoHint"></div>
       </div>
       <div class="err-text" id="bkErr"></div>
       <div class="sheet-actions">
@@ -689,6 +721,64 @@
         <button type="submit" class="btn btn-accent" id="btnBkSubmit" data-i18n="confirmBooking">ยืนยันการจอง</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="scrim" id="scrimDup">
+  <div class="sheet">
+    <div class="sheet-grab"></div>
+    <h3 data-i18n="dupTitle">พบข้อมูลการจองซ้ำในระบบ</h3>
+    <div class="sheet-sub" data-i18n="dupSub">โปรดเลือกเพื่อดำเนินการต่อ</div>
+    <div class="dup-fields" id="dupFields"></div>
+    <div class="dup-opt">
+      <button type="button" class="btn btn-accent btn-block" id="btnDupMore" data-i18n="dupMoreBtn">ยืนยันการจองเพิ่มเติม</button>
+      <div class="dup-hint" data-i18n="dupMoreHint"></div>
+      <button type="button" class="btn btn-block" id="btnDupChange" data-i18n="dupChangeBtn">ต้องการเปลี่ยนแปลงการจอง</button>
+      <div class="dup-hint" data-i18n="dupChangeHint"></div>
+    </div>
+    <div class="sheet-actions"><button type="button" class="btn" id="btnDupBack" data-i18n="dupBack">กลับไปแก้ไขข้อมูล</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrimChange">
+  <div class="sheet">
+    <div class="sheet-grab"></div>
+    <h3 data-i18n="chTitle">ขอเปลี่ยนแปลงการจอง</h3>
+    <div class="sheet-sub" data-i18n="chSub"></div>
+    <form id="chForm">
+      <div class="field-row">
+        <div class="field"><label data-i18n="chOldTable">โต๊ะเดิมที่จองไว้</label><input type="text" id="chOld" required maxlength="12" data-i18n-ph="chOldTablePh" /></div>
+        <div class="field"><label data-i18n="chNewTable">ย้ายไปโต๊ะใหม่</label><select id="chNew"></select></div>
+      </div>
+      <div class="field"><label data-i18n="labelShopName">ชื่อร้าน / แบรนด์</label><input type="text" id="chShop" required maxlength="80" /></div>
+      <div class="field-row">
+        <div class="field"><label data-i18n="labelContact">ผู้ติดต่อ</label><input type="text" id="chContact" required maxlength="60" /></div>
+        <div class="field"><label data-i18n="labelPhone">เบอร์โทร</label><input type="tel" id="chPhone" required maxlength="20" /></div>
+      </div>
+      <div class="field"><label data-i18n="labelEmail">อีเมล</label><input type="email" id="chEmail" required maxlength="120" /></div>
+      <div class="field">
+        <label data-i18n="chSlipLabel">สลิปใบเดิม (จำเป็น)</label>
+        <div class="logo-pick">
+          <div class="preview" id="chSlipPreview">SLIP</div>
+          <input type="file" id="chSlipFile" accept="image/jpeg,image/png,image/webp,image/gif" />
+        </div>
+        <div class="slip-scan" id="chSlipScan" aria-live="polite"></div>
+      </div>
+      <div class="err-text" id="chErr"></div>
+      <div class="sheet-actions">
+        <button type="button" class="btn" id="btnChCancel" data-i18n="cancel">ยกเลิก</button>
+        <button type="submit" class="btn btn-accent" id="btnChSubmit" data-i18n="chSubmit">ส่งคำขอเปลี่ยนแปลง</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="scrim" id="scrimOk">
+  <div class="sheet">
+    <div class="sheet-grab"></div>
+    <div class="ok-hero"><div class="ok-ic">✓</div><h3 id="okTitle"></h3></div>
+    <div class="ok-lines" id="okLines"></div>
+    <div class="sheet-actions"><button type="button" class="btn btn-accent" id="btnOkClose" data-i18n="okClose">ตกลง</button></div>
   </div>
 </div>
 
@@ -1003,6 +1093,7 @@
   var tables = {};     // id -> {id,zoneKey,x,y,w,h}
   var bookings = {};   // tableId -> {tableId,shop,contact,phone,email,line,category,note,hasPower,powerFee,price,status,hasSlip,hasLogo,slipData,logoData,createdAt,updatedAt,custom}
   var currentBookingEditId = null;
+  var changeRequests = [];  // admin only: customers' requests to move a booking (from get_admin_state)
   var slipsData = [];      // admin only: every slip, already in transfer order (from get_admin_state)
   var bkSlipScan_ = null;  // QR scan of the slip currently chosen in the booking form: {file, promise}
   var DEFAULT_CONFIG = {
@@ -1227,7 +1318,9 @@
       dbConnectFailed:"เชื่อมต่อฐานข้อมูลไม่สำเร็จ — ตรวจสอบ SUPABASE_URL ในไฟล์ index.html",
       scriptUrlNotSet:"ยังไม่ได้ตั้งค่า SUPABASE_URL — แก้ไขค่านี้ในไฟล์ index.html ก่อนใช้งาน",
       accountNumberCopied:"คัดลอกเลขบัญชีแล้ว", copyBtn:"คัดลอก", transferToAccount:"โอนเงินมาที่บัญชี",
-      accountNamePrefix:"ชื่อบัญชี: ", paymentAccountImgAlt:"บัญชีรับเงิน"
+      accountNamePrefix:"ชื่อบัญชี: ", paymentAccountImgAlt:"บัญชีรับเงิน",
+      legendFree:"ว่าง", legendPending:"จองแล้ว · รอตรวจสอบสลิป", legendConfirmed:"จองแล้ว · ยืนยันแล้ว", tipPending:"จองแล้ว (รอตรวจสอบ)", tipConfirmed:"จองแล้ว (ยืนยันแล้ว)", dupTitle:"พบข้อมูลการจองซ้ำในระบบ", dupSub:"โปรดเลือกเพื่อดำเนินการต่อ", dupFieldsFmt:"ข้อมูลที่ซ้ำ: {fields}", dupField_shop:"ชื่อร้าน", dupField_contact:"ชื่อผู้จอง", dupField_phone:"เบอร์โทร", dupField_email:"อีเมล", dupMoreBtn:"ยืนยันการจองเพิ่มเติม", dupMoreHint:"จองโต๊ะนี้เพิ่มจากที่เคยจอง ทีมงานจะตรวจกับสลิป (โอนรวมหลายโต๊ะในสลิปเดียวได้)", dupChangeBtn:"ต้องการเปลี่ยนแปลงการจอง", dupChangeHint:"ย้ายโต๊ะที่เคยจองมาเป็นโต๊ะนี้ ต้องแนบสลิปใบเดิมและกรอกข้อมูลเดิม", dupBack:"กลับไปแก้ไขข้อมูล", chTitle:"ขอเปลี่ยนแปลงการจอง", chSub:"ย้ายโต๊ะเดิมมาเป็นโต๊ะใหม่ — กรอกข้อมูลเดิมและแนบสลิปใบเดิมเพื่อตรวจสอบ", chOldTable:"โต๊ะเดิมที่จองไว้", chOldTablePh:"เช่น S24", chNewTable:"ย้ายไปโต๊ะใหม่", chSlipLabel:"สลิปใบเดิม (จำเป็น)", chSubmit:"ส่งคำขอเปลี่ยนแปลง", chNeedSlip:"กรุณาแนบสลิปใบเดิม", chNeedOld:"กรุณากรอกโต๊ะเดิมที่ถูกต้อง", chSentTitle:"ส่งคำขอแล้ว", chSentBody:"ข้อมูลหรือสลิปยังไม่ตรงกับที่เก็บไว้ทั้งหมด ทีมงานจะตรวจสอบและแจ้งกลับ โต๊ะเดิมของคุณยังไม่ถูกเปลี่ยน", chMovedTitle:"เปลี่ยนโต๊ะสำเร็จ", chMovedBody:"ย้ายการจองจากโต๊ะ {old} ไปโต๊ะ {new} เรียบร้อยแล้ว", chErrNotFound:"ไม่พบการจองของโต๊ะเดิมนี้ ตรวจเลขโต๊ะอีกครั้ง", chErrNotAvail:"โต๊ะใหม่ไม่ว่างแล้ว", chErrTooMany:"ส่งคำขอบ่อยเกินไป กรุณาติดต่อทีมงาน", okTitle:"จองโต๊ะสำเร็จ", okTablesFmt:"โต๊ะ: {ids}", okAmountFmt:"ยอดที่ต้องโอน: {amount}", okSlipSent:"ได้รับสลิปแล้ว ทีมงานจะตรวจสอบและยืนยันให้", okSlipLater:"ยังไม่ได้แนบสลิป กรุณาโอนและส่งสลิปให้ทีมงาน เพื่อยืนยันโต๊ะ", okSkippedFmt:"ยกเว้นโต๊ะที่เพิ่งถูกจองไปก่อน: {ids}", okClose:"ตกลง", uploadBadType:"รองรับเฉพาะไฟล์รูปภาพ (JPG, PNG, WebP)", uploadTooBigFmt:"ไฟล์ใหญ่เกินไป (สูงสุด {mb} MB)", logoHint:"รองรับ JPG / PNG / WebP · แนะนำอย่างน้อย 1240×1748 px เพื่อพิมพ์ขนาด A6", logoOkFmt:"✓ โลโก้ {w}×{h} px — ความละเอียดพอสำหรับพิมพ์ A6", logoLowFmt:"โลโก้ {w}×{h} px ความละเอียดต่ำกว่าที่แนะนำสำหรับพิมพ์ A6 (1240×1748 px) — ส่งต่อได้ แต่งานพิมพ์อาจไม่คมชัด", dupBadgeFmt:"ซ้ำกับ {tables}", dupBadgeConfirmed:"ลูกค้ายืนยันจองเพิ่ม", dupBadgeUnconfirmed:"ไม่ได้ยืนยัน", changesSectionTitle:"คำขอเปลี่ยนแปลงการจอง", changesEmpty:"ยังไม่มีคำขอเปลี่ยนแปลง", changeAuto:"ย้ายอัตโนมัติแล้ว", changeApprove:"อนุมัติและย้าย", changeReject:"ปฏิเสธ", changeApproved:"อนุมัติแล้ว", changeRejected:"ปฏิเสธแล้ว", changePending:"รอตรวจสอบ", changeDecided:"ดำเนินการคำขอแล้ว", changeFailed:"ดำเนินการไม่สำเร็จ (โต๊ะใหม่อาจไม่ว่างแล้ว)", chkData:"ข้อมูลตรง", chkSlip:"สลิป QR ตรง", chkPrice:"ราคาเท่ากัน", changeSlipFile:"ดูสลิปที่แนบ", slipLinkLabel:"ใช้สลิปนี้กับโต๊ะอื่นด้วย (คั่นด้วยจุลภาค เช่น S24, S25)", slipLinkBtn:"ผูกสลิปกับโต๊ะเหล่านี้", slipLinked:"ผูกสลิปแล้ว",
+      chkOk:"ข้อมูลครบแล้ว", chkWarnTitle:"ข้อมูลยังไม่ครบ", issNoSlip:"ยังไม่มีสลิป", issSlipUnchecked:"สลิปยังไม่ได้ตรวจ/ยืนยัน", issSlipBad:"สลิปไม่ผ่าน/ยอดไม่ตรง", issShort:"ยอดโอนไม่ครบ (ขาด {n})", issNoLogo:"ยังไม่มีโลโก้", issDup:"การจองซ้ำยังไม่ได้ตรวจ", issSummaryFmt:"ครบ {ok} · ยังไม่ครบ {bad}"
     },
     en: {
       currency:"THB", save:"Save", cancel:"Cancel", close:"Close", edit:"Edit",
@@ -1321,7 +1414,9 @@
       dbConnectFailed:"Could not connect to the database — check SUPABASE_URL in index.html",
       scriptUrlNotSet:"SUPABASE_URL isn't set yet — edit this value in index.html before using the page",
       accountNumberCopied:"Account number copied", copyBtn:"Copy", transferToAccount:"Transfer payment to",
-      accountNamePrefix:"Account name: ", paymentAccountImgAlt:"Payment account"
+      accountNamePrefix:"Account name: ", paymentAccountImgAlt:"Payment account",
+      legendFree:"Available", legendPending:"Booked · awaiting slip check", legendConfirmed:"Booked · confirmed", tipPending:"Booked (awaiting check)", tipConfirmed:"Booked (confirmed)", dupTitle:"A booking with the same details already exists", dupSub:"Please choose how to continue", dupFieldsFmt:"Matching details: {fields}", dupField_shop:"shop name", dupField_contact:"contact name", dupField_phone:"phone", dupField_email:"email", dupMoreBtn:"Confirm an additional booking", dupMoreHint:"Book this table in addition to your earlier one. The team checks it against your slip (one slip may cover several tables).", dupChangeBtn:"I want to change my booking", dupChangeHint:"Move your earlier booking to this table. Attach your original slip and enter your original details.", dupBack:"Back to the form", chTitle:"Change my booking", chSub:"Move your booking to the new table — enter your original details and attach your original slip to verify.", chOldTable:"Your current table", chOldTablePh:"e.g. S24", chNewTable:"Move to", chSlipLabel:"Original slip (required)", chSubmit:"Send change request", chNeedSlip:"Please attach your original slip", chNeedOld:"Please enter a valid current table", chSentTitle:"Request sent", chSentBody:"Your details or slip could not be matched automatically. The team will review and get back to you. Your current table is unchanged.", chMovedTitle:"Table changed", chMovedBody:"Your booking moved from table {old} to {new}.", chErrNotFound:"No booking found for that table. Check the table number.", chErrNotAvail:"The new table is no longer available.", chErrTooMany:"Too many requests — please contact the team.", okTitle:"Booking received", okTablesFmt:"Table(s): {ids}", okAmountFmt:"Amount to transfer: {amount}", okSlipSent:"We received your slip — the team will check and confirm.", okSlipLater:"No slip attached yet — please transfer and send your slip to the team to confirm your table.", okSkippedFmt:"Skipped (just booked by someone else): {ids}", okClose:"OK", uploadBadType:"Images only (JPG, PNG, WebP)", uploadTooBigFmt:"File too large (max {mb} MB)", logoHint:"JPG / PNG / WebP · at least 1240×1748 px recommended for A6 printing", logoOkFmt:"✓ Logo {w}×{h} px — enough for A6 printing", logoLowFmt:"Logo {w}×{h} px is below the recommended size for A6 printing (1240×1748 px) — you can still send it, but the print may look soft.", dupBadgeFmt:"Duplicate of {tables}", dupBadgeConfirmed:"customer confirmed extra", dupBadgeUnconfirmed:"not confirmed", changesSectionTitle:"Booking change requests", changesEmpty:"No change requests yet", changeAuto:"moved automatically", changeApprove:"Approve & move", changeReject:"Reject", changeApproved:"approved", changeRejected:"rejected", changePending:"pending", changeDecided:"Request updated", changeFailed:"Could not apply (the new table may be taken)", chkData:"details match", chkSlip:"slip QR matches", chkPrice:"same price", changeSlipFile:"view attached slip", slipLinkLabel:"Use this slip for more tables too (comma separated, e.g. S24, S25)", slipLinkBtn:"Link slip to these tables", slipLinked:"Slip linked",
+      chkOk:"Complete", chkWarnTitle:"Incomplete", issNoSlip:"no slip yet", issSlipUnchecked:"slip not verified yet", issSlipBad:"slip rejected / amount mismatch", issShort:"paid amount short by {n}", issNoLogo:"no logo yet", issDup:"duplicate booking not reviewed", issSummaryFmt:"complete {ok} · incomplete {bad}"
     },
     zh: {
       currency:"泰铢", save:"保存", cancel:"取消", close:"关闭", edit:"编辑",
@@ -1415,7 +1510,9 @@
       dbConnectFailed:"无法连接数据库 — 请检查 index.html 中的 SUPABASE_URL",
       scriptUrlNotSet:"尚未设置 SUPABASE_URL — 使用前请先在 index.html 中修改此值",
       accountNumberCopied:"账户号码已复制", copyBtn:"复制", transferToAccount:"转账至以下账户",
-      accountNamePrefix:"账户名称：", paymentAccountImgAlt:"收款账户"
+      accountNamePrefix:"账户名称：", paymentAccountImgAlt:"收款账户",
+      chkOk:"资料齐全", chkWarnTitle:"资料未齐", issNoSlip:"尚无凭证", issSlipUnchecked:"凭证未核实", issSlipBad:"凭证未通过/金额不符", issShort:"转账金额不足（差 {n}）", issNoLogo:"尚无 Logo", issDup:"重复预订未核对", issSummaryFmt:"齐全 {ok} · 未齐 {bad}",
+      legendFree:"空位", legendPending:"已订 · 待审核凭证", legendConfirmed:"已订 · 已确认", tipPending:"已订（待审核）", tipConfirmed:"已订（已确认）", dupTitle:"系统中已有相同信息的预订", dupSub:"请选择如何继续", dupFieldsFmt:"重复的信息：{fields}", dupField_shop:"店名", dupField_contact:"联系人", dupField_phone:"电话", dupField_email:"邮箱", dupMoreBtn:"确认追加预订", dupMoreHint:"在原有预订之外追加此桌，团队会核对凭证（一张凭证可支付多张桌）", dupChangeBtn:"我要更改预订", dupChangeHint:"将原预订改到此桌，需附原凭证并填写原信息", dupBack:"返回修改", chTitle:"更改预订", chSub:"将原预订改到新桌 — 请填写原信息并附原凭证以便核对", chOldTable:"原预订的桌号", chOldTablePh:"例如 S24", chNewTable:"改到新桌", chSlipLabel:"原凭证（必填）", chSubmit:"提交更改请求", chNeedSlip:"请附上原凭证", chNeedOld:"请填写有效的原桌号", chSentTitle:"请求已提交", chSentBody:"信息或凭证未能自动匹配，团队将审核并回复。原桌位保持不变。", chMovedTitle:"更改成功", chMovedBody:"预订已从 {old} 号桌改到 {new} 号桌", chErrNotFound:"未找到该桌的预订，请检查桌号", chErrNotAvail:"新桌已被预订", chErrTooMany:"请求过多，请联系团队", okTitle:"预订成功", okTablesFmt:"桌号：{ids}", okAmountFmt:"应转账金额：{amount}", okSlipSent:"已收到凭证，团队将审核并确认", okSlipLater:"尚未附凭证，请转账并将凭证发给团队以确认桌位", okSkippedFmt:"未预订成功（刚被他人订走）：{ids}", okClose:"好的", uploadBadType:"仅支持图片（JPG、PNG、WebP）", uploadTooBigFmt:"文件过大（最大 {mb} MB）", logoHint:"支持 JPG / PNG / WebP · A6 印刷建议至少 1240×1748 像素", logoOkFmt:"✓ Logo {w}×{h} 像素 — 满足 A6 印刷", logoLowFmt:"Logo {w}×{h} 像素低于 A6 印刷建议尺寸（1240×1748）— 仍可提交，但印刷可能不够清晰", dupBadgeFmt:"与 {tables} 重复", dupBadgeConfirmed:"客户确认追加", dupBadgeUnconfirmed:"未确认", changesSectionTitle:"预订更改请求", changesEmpty:"暂无更改请求", changeAuto:"已自动更改", changeApprove:"批准并更改", changeReject:"拒绝", changeApproved:"已批准", changeRejected:"已拒绝", changePending:"待处理", changeDecided:"请求已处理", changeFailed:"处理失败（新桌可能已被订）", chkData:"信息匹配", chkSlip:"凭证二维码匹配", chkPrice:"价格相同", changeSlipFile:"查看附件凭证", slipLinkLabel:"此凭证同时用于其他桌（逗号分隔，如 S24, S25）", slipLinkBtn:"将凭证关联到这些桌", slipLinked:"已关联凭证"
     }
   };
 
@@ -1682,6 +1779,53 @@
     });
   }
 
+  /* ---- uploads: keep slips readable and logos print-ready (A6 = 105x148 mm, 1240x1748 px at 300 dpi) ---- */
+  var UPLOAD_ABS_MAX = 30*1024*1024, UPLOAD_STORE_MAX = 9.5*1024*1024;
+  var UPLOAD_PLAN = { slip:{ keep:3*1024*1024, side:2400, q:0.92 }, logo:{ keep:9*1024*1024, side:4000, q:0.95 } };
+  var LOGO_MIN_SIDE = 1240;
+  function isUploadImage_(f){ return /^image\/(jpeg|png|webp|gif)$/i.test(f.type || "") || (!f.type && /\.(jpe?g|png|webp|gif)$/i.test(f.name || "")); }
+  function validateUpload_(f){
+    if (!f) return null;
+    if (!isUploadImage_(f)) return { key:"uploadBadType" };
+    if (f.size > UPLOAD_ABS_MAX) return { key:"uploadTooBigFmt", vars:{ mb:30 } };
+    return null;
+  }
+  function dataUrlBytes_(u){ var i = u.indexOf(","); return Math.floor((u.length - i - 1) * 3 / 4); }
+  function loadImage_(u){ return new Promise(function(res, rej){ var im = new Image(); im.onload = function(){ res(im); }; im.onerror = rej; im.src = u; }); }
+  function imageSize_(file){
+    return fileToDataUrl_(file).then(loadImage_).then(function(im){ return { w: im.naturalWidth || im.width, h: im.naturalHeight || im.height }; }).catch(function(){ return null; });
+  }
+  // Keeps the original file when it is a normal-sized JPEG/PNG/WebP (full quality, PNG transparency intact);
+  // otherwise re-encodes it at high quality, never above ~9.5 MB, never upscaled.
+  function prepareUpload_(file, kind){
+    if (!file) return Promise.resolve(null);
+    var plan = UPLOAD_PLAN[kind] || UPLOAD_PLAN.slip;
+    return fileToDataUrl_(file).then(function(dataUrl){
+      return loadImage_(dataUrl).then(function(img){
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, type = (file.type || "").toLowerCase();
+        var longSide = Math.max(w, h);
+        if (/^image\/(jpeg|png|webp)$/.test(type) && file.size <= plan.keep && longSide <= 6000){
+          return { dataUrl: dataUrl, width: w, height: h, bytes: file.size, resized: false };
+        }
+        var scale = Math.min(1, plan.side / longSide), cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        var asPng = (type === "image/png" && kind === "logo"), q = plan.q, out;
+        for (var i = 0; i < 6; i++){
+          var c = document.createElement("canvas"); c.width = cw; c.height = ch;
+          var ctx = c.getContext("2d");
+          if (!asPng){ ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cw, ch); }
+          ctx.drawImage(img, 0, 0, cw, ch);
+          out = asPng ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", q);
+          if (dataUrlBytes_(out) <= UPLOAD_STORE_MAX) break;
+          if (asPng || q <= 0.6){ cw = Math.round(cw * 0.85); ch = Math.round(ch * 0.85); } else q -= 0.08;
+        }
+        return { dataUrl: out, width: cw, height: ch, bytes: dataUrlBytes_(out), resized: true };
+      }, function(){
+        if (file.size <= UPLOAD_STORE_MAX) return { dataUrl: dataUrl, width: 0, height: 0, bytes: file.size, resized: false };
+        throw new Error("image could not be read");
+      });
+    });
+  }
+
   /* =========================================================
      DB SHIM — same collection()/doc().onSnapshot()/set()/update()/delete()
      surface the rest of this file already calls, backed by a Google Apps
@@ -1930,6 +2074,8 @@
         }
         var ns = Array.isArray(d.slips) ? d.slips : [];
         if (JSON.stringify(ns) !== JSON.stringify(slipsData)){ slipsData = ns; render(); }
+        var nc = Array.isArray(d.changeRequests) ? d.changeRequests : [];
+        if (JSON.stringify(nc) !== JSON.stringify(changeRequests)){ changeRequests = nc; render(); }
         _dbEverLoaded = true;
       })
       .catch(function(err){
@@ -2084,7 +2230,7 @@
     // read exactly like the customer view, so hide it whenever isAdmin
     if (!_isPreviewFrame) $("adminTrigger").hidden = isAdmin;
     [renderTopbar, renderHero, renderStaticText_, renderStats, renderLegend, renderAdminBar,
-     renderCanvas, renderBookingsPanel, renderSlipsPanel, renderZonesPanel, renderFieldsPanel].forEach(function(fn){
+     renderCanvas, renderBookingsPanel, renderSlipsPanel, renderChangesPanel, renderZonesPanel, renderFieldsPanel].forEach(function(fn){
       try{ fn(); }catch(e){ console.error("mayucard6: " + (fn.name || "render") + " failed", e); }
     });
   }
@@ -2311,7 +2457,7 @@
       var btns = zTables.map(function(tb){
         var booking = bookings[tb.id];
         var col = zoneColor(tb.zoneKey);
-        var cls = "table-btn" + (booking ? " is-booked" : "") + (selectedTableIds.indexOf(tb.id) > -1 ? " is-selected" : "");
+        var cls = "table-btn" + (booking ? bkClass_(booking) : "") + (selectedTableIds.indexOf(tb.id) > -1 ? " is-selected" : "");
         var statusHtml = booking
           ? '<svg class="lock-ic" viewBox="0 0 24 24" width="10" height="10" fill="currentColor" aria-hidden="true"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm3 8H9V6a3 3 0 0 1 6 0z"/></svg>'+esc(t("tableBooked"))
           : esc(t("tableFree"));
@@ -2338,6 +2484,9 @@
     });
   }
 
+  function bkConfirmed_(b){ return !!b && (b.status === "paid" || b.status === "confirmed"); }
+  function bkClass_(b){ return " is-booked " + (bkConfirmed_(b) ? "is-confirmed" : "is-pending"); }
+
   function renderFloorplanView_(editing){
     var wrap = $("canvasWrap");
     wrap.classList.toggle("is-editing", editing);
@@ -2358,12 +2507,12 @@
       layer.appendChild(empty);
     }
 
-    var unnamedShopText_ = t("unnamedShop");
+    var unnamedShopText_ = t("unnamedShop"), tipPendingText_ = t("tipPending"), tipConfirmedText_ = t("tipConfirmed");
     list.forEach(function(t){
       var booking = bookings[t.id];
       var col = zoneColor(t.zoneKey);
       var el = document.createElement("div");
-      el.className = "tbl" + (booking ? " is-booked" : "") + (selectedTableIds.indexOf(t.id) > -1 ? " is-selected" : "");
+      el.className = "tbl" + (booking ? bkClass_(booking) : "") + (selectedTableIds.indexOf(t.id) > -1 ? " is-selected" : "");
       if (activeZoneFilter && activeZoneFilter !== t.zoneKey) el.classList.add("is-dim");
       el.style.setProperty("--tc", col);
       el.style.left = t.x + "%";
@@ -2373,6 +2522,7 @@
       el.dataset.id = t.id;
       el.innerHTML = '<span class="lbl">'+esc(t.id)+'</span>';
       var ttip = t.id + " · " + fmtPrice(zonePrice(t));
+      if (booking) ttip = t.id + " · " + (bkConfirmed_(booking) ? tipConfirmedText_ : tipPendingText_);
       if (booking && isAdmin) ttip = t.id + " — " + (booking.shop || unnamedShopText_);
       el.title = ttip;
 
@@ -2617,7 +2767,7 @@
     $("bkTitle").textContent = t("tablePrefix") + tableId;
     $("bkSub").textContent = (z ? localizedText_(z.label) : "") + " · " + fmtPrice(zonePrice(table));
     $("bkErr").textContent = "";
-    $("bkLogoPreview").innerHTML = "LOGO";
+    $("bkLogoPreview").innerHTML = "LOGO"; $("bkLogoNote").className = "slip-scan"; $("bkLogoNote").textContent = t("logoHint");
     $("bkSlipPreview").innerHTML = "SLIP";
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
@@ -2650,7 +2800,7 @@
     $("bkTitle").textContent = t("multiBkTitleFmt", {n: ids.length, ids: ids.join(", ")});
     $("bkSub").textContent = t("multiBkSubFmt", {total: fmtPrice(total)});
     $("bkErr").textContent = "";
-    $("bkLogoPreview").innerHTML = "LOGO";
+    $("bkLogoPreview").innerHTML = "LOGO"; $("bkLogoNote").className = "slip-scan"; $("bkLogoNote").textContent = t("logoHint");
     $("bkSlipPreview").innerHTML = "SLIP";
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
@@ -2669,10 +2819,20 @@
   $("btnMsClear").addEventListener("click", function(){ clearSelection_(); });
   $("btnMsBook").addEventListener("click", function(){ openMultiBookingSheet_(); });
   $("bkLogoFile").addEventListener("change", function(){
-    var f = this.files[0];
-    if (!f) return;
+    var f = this.files[0], note = $("bkLogoNote");
+    note.className = "slip-scan"; note.textContent = t("logoHint");
+    if (!f){ $("bkLogoPreview").innerHTML = "LOGO"; return; }
+    var bad = validateUpload_(f);
+    if (bad){ $("bkErr").textContent = t(bad.key, bad.vars); this.value = ""; $("bkLogoPreview").innerHTML = "LOGO"; return; }
+    $("bkErr").textContent = "";
     prepareFile_(f).then(function(dataUrl){
       $("bkLogoPreview").innerHTML = imgTag_(dataUrl) || "LOGO";
+    });
+    imageSize_(f).then(function(sz){
+      if (!sz || $("bkLogoFile").files[0] !== f) return;
+      var low = Math.min(sz.w, sz.h) < LOGO_MIN_SIDE;
+      note.className = "slip-scan " + (low ? "warn" : "ok");
+      note.textContent = t(low ? "logoLowFmt" : "logoOkFmt", { w: sz.w, h: sz.h });
     });
   });
   $("bkSlipFile").addEventListener("change", function(){
@@ -2680,6 +2840,9 @@
     var note = $("bkSlipScan");
     bkSlipScan_ = null; note.className = "slip-scan"; note.textContent = "";
     if (!f) return;
+    var badSlip = validateUpload_(f);
+    if (badSlip){ $("bkErr").textContent = t(badSlip.key, badSlip.vars); this.value = ""; $("bkSlipPreview").innerHTML = "SLIP"; return; }
+    $("bkErr").textContent = "";
     prepareFile_(f).then(function(dataUrl){
       $("bkSlipPreview").innerHTML = imgTag_(dataUrl) || "SLIP";
     });
@@ -2712,6 +2875,7 @@
     if (!shop || !contact || !phone || !email){ $("bkErr").textContent = t("fillAllFields"); return; }
     var missingCustom = validateCustomRequired_("bk");
     if (missingCustom){ $("bkErr").textContent = t("pleaseEnterFmt", {field: missingCustom}); return; }
+    var runSubmit_ = function(dupConfirmed){
     var btn = $("btnBkSubmit");
     btn.disabled = true; btn.textContent = t("saving");
     var logoFile = $("bkLogoFile").files[0] || null;
@@ -2719,8 +2883,8 @@
     var slipScanP = !slipFile ? Promise.resolve(null)
       : ((bkSlipScan_ && bkSlipScan_.file === slipFile) ? bkSlipScan_.promise
          : scanSlipQr_(slipFile).catch(function(){ return { found:false, slip:false }; }));
-    Promise.all([prepareFile_(logoFile), prepareFile_(slipFile, SLIP_MAX_SIDE, SLIP_QUALITY), slipScanP]).then(function(res){
-      var logoDataUrl = res[0], slipDataUrl = res[1], slipInfo = slipInfoFromScan_(res[2], !!slipDataUrl);
+    Promise.all([prepareUpload_(logoFile, "logo"), prepareUpload_(slipFile, "slip"), slipScanP]).then(function(res){
+      var logoDataUrl = res[0] && res[0].dataUrl, slipDataUrl = res[1] && res[1].dataUrl, slipInfo = slipInfoFromScan_(res[2], !!slipDataUrl);
       var powerFee = hasPower ? POWER_FEE : 0;
       var now = new Date().toISOString();
       var shared = {
@@ -2728,6 +2892,7 @@
         line: line, category: category, note: note,
         hasPower: hasPower, powerFee: powerFee,
         status: "pending", createdAt: now, updatedAt: now,
+        dupConfirmed: !!dupConfirmed,
         custom: collectCustomValues_("bk"),
         hasSlip: !!slipDataUrl, hasLogo: !!logoDataUrl,
         slip: slipInfo,
@@ -2758,15 +2923,15 @@
         render();
         var bookedIds = (result && result.booked) || [];
         var skippedIds = (result && result.skipped) || [];
-        var msg = bookedIds.length
-          ? t("bookingSuccessMultiFmt", {n: bookedIds.length, ids: bookedIds.join(", ")})
-          : t("bookingFailedAllTaken");
-        if (skippedIds.length){
-          msg += t("bookingSkippedFmt", {n: skippedIds.length, ids: skippedIds.join(", ")});
+        if (bookedIds.length){
+          var totalAmt = 0;
+          Object.keys((result && result.bookings) || {}).forEach(function(k){ totalAmt += Number(result.bookings[k].price || 0); });
+          showBookingOk_(bookedIds, totalAmt, !!slipFile, skippedIds);
+        } else {
+          toast(t("bookingFailedAllTaken"));
         }
-        toast(msg);
       } else {
-        toast(t("bookingSuccessSingleFmt", {id: tableId}));
+        showBookingOk_([tableId], Number((result && result.booking && result.booking.price) || (table ? zonePrice(table) + (hasPower ? POWER_FEE : 0) : 0)), !!slipFile, []);
       }
     }).catch(function(err){
       btn.disabled = false; btn.textContent = t("confirmBooking");
@@ -2781,7 +2946,130 @@
         $("bkErr").textContent = t("saveFailedRetry") + (msg ? " (" + msg + ")" : "");
       }
     });
+    };
+    // duplicate check: same shop / phone / email (or a 3+ letter contact name) already booked?
+    var ack = dupAcknowledged_; dupAcknowledged_ = false;
+    if (ack){ runSubmit_(true); return; }
+    var chk = $("btnBkSubmit"); chk.disabled = true; chk.textContent = t("saving");
+    _rpc("check_duplicate", { p_shop: shop, p_contact: contact, p_phone: phone, p_email: email }).then(function(r){
+      chk.disabled = false; chk.textContent = t("confirmBooking");
+      if (r && r.duplicate){ showDupPopup_(r.fields || []); return; }
+      runSubmit_(false);
+    }, function(){
+      chk.disabled = false; chk.textContent = t("confirmBooking");
+      runSubmit_(false);      // never block a booking because the check failed; the server stamps duplicates itself
+    });
   });
+
+  /* =========================================================
+     DUPLICATE POPUP · BOOKING CHANGE · SUCCESS DIALOG
+  ========================================================= */
+  var dupAcknowledged_ = false;
+  var chSlipScan_ = null;
+  function showDupPopup_(fields){
+    var names = (fields || []).map(function(f){ return t("dupField_" + f); }).join(", ");
+    $("dupFields").textContent = names ? t("dupFieldsFmt", { fields: names }) : "";
+    openSheet("scrimDup");
+  }
+  $("btnDupBack").addEventListener("click", function(){ closeSheet("scrimDup"); });
+  $("scrimDup").addEventListener("click", function(e){ if (e.target.id === "scrimDup") closeSheet("scrimDup"); });
+  $("btnDupMore").addEventListener("click", function(){
+    closeSheet("scrimDup");
+    dupAcknowledged_ = true;                       // the customer confirmed: send the booking as an additional one
+    var f = $("bkForm");
+    if (f.requestSubmit) f.requestSubmit(); else $("btnBkSubmit").click();
+  });
+  $("btnDupChange").addEventListener("click", function(){ closeSheet("scrimDup"); openChangeSheet_(); });
+
+  function findTableId_(raw){
+    raw = String(raw || "").trim().toLowerCase().replace(/\s+/g, "");
+    return Object.keys(tables).filter(function(k){ return k.toLowerCase() === raw; })[0] || null;
+  }
+  function openChangeSheet_(){
+    var ids = (Array.isArray(currentBookTableIds) && currentBookTableIds.length) ? currentBookTableIds.slice() : (currentBookTableId ? [currentBookTableId] : []);
+    $("chNew").innerHTML = ids.map(function(id){ return '<option value="'+esc(id)+'">'+esc(id)+'</option>'; }).join("");
+    $("chOld").value = "";
+    $("chShop").value = $("bkShop").value.trim(); $("chContact").value = $("bkContact").value.trim();
+    $("chPhone").value = $("bkPhone").value.trim(); $("chEmail").value = $("bkEmail").value.trim();
+    $("chSlipFile").value = ""; $("chSlipPreview").innerHTML = "SLIP"; chSlipScan_ = null;
+    $("chSlipScan").className = "slip-scan"; $("chSlipScan").textContent = ""; $("chErr").textContent = "";
+    openSheet("scrimChange");
+  }
+  $("btnChCancel").addEventListener("click", function(){ closeSheet("scrimChange"); });
+  $("scrimChange").addEventListener("click", function(e){ if (e.target.id === "scrimChange") closeSheet("scrimChange"); });
+  $("chSlipFile").addEventListener("change", function(){
+    var f = this.files[0], note = $("chSlipScan");
+    chSlipScan_ = null; note.className = "slip-scan"; note.textContent = "";
+    if (!f){ $("chSlipPreview").innerHTML = "SLIP"; return; }
+    var bad = validateUpload_(f);
+    if (bad){ $("chErr").textContent = t(bad.key, bad.vars); this.value = ""; $("chSlipPreview").innerHTML = "SLIP"; return; }
+    $("chErr").textContent = "";
+    prepareFile_(f).then(function(dataUrl){ $("chSlipPreview").innerHTML = imgTag_(dataUrl) || "SLIP"; });
+    var pr = scanSlipQr_(f).catch(function(){ return { found:false, slip:false }; });
+    var mine = { file: f, promise: pr };
+    chSlipScan_ = mine;
+    note.textContent = t("slipQrReading");
+    pr.then(function(r){
+      if (chSlipScan_ !== mine) return;
+      if (r.slip){ note.className = "slip-scan ok"; note.textContent = t("slipQrOk"); }
+      else { note.className = "slip-scan warn"; note.textContent = r.found ? t("slipQrOther") : t("slipQrNone"); }
+    });
+  });
+  $("chForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var oldId = findTableId_($("chOld").value), newId = $("chNew").value;
+    var shop = $("chShop").value.trim(), contact = $("chContact").value.trim(), phone = $("chPhone").value.trim(), email = $("chEmail").value.trim();
+    var file = $("chSlipFile").files[0] || null;
+    if (!oldId){ $("chErr").textContent = t("chNeedOld"); return; }
+    if (!shop || !contact || !phone || !email){ $("chErr").textContent = t("fillAllFields"); return; }
+    if (!file){ $("chErr").textContent = t("chNeedSlip"); return; }
+    if (!newId){ $("chErr").textContent = t("selectedTablesAllTaken"); return; }
+    var btn = $("btnChSubmit"); btn.disabled = true; btn.textContent = t("saving"); $("chErr").textContent = "";
+    var scanP = (chSlipScan_ && chSlipScan_.file === file) ? chSlipScan_.promise : scanSlipQr_(file).catch(function(){ return { found:false, slip:false }; });
+    Promise.all([prepareUpload_(file, "slip"), scanP]).then(function(res){
+      return _dbUploadEmbedded({ slipData: { dataUrl: res[0].dataUrl, filename: file.name } }).then(function(clean){
+        return _rpc("request_booking_change", {
+          p_old: oldId, p_new: newId,
+          p_data: { shop: shop, contact: contact, phone: phone, email: email },
+          p_slip: slipInfoFromScan_(res[1], true) || { qrFound: false },
+          p_file: clean.slipData || null
+        });
+      });
+    }).then(function(r){
+      btn.disabled = false; btn.textContent = t("chSubmit");
+      closeSheet("scrimChange"); closeSheet("scrimBooking");
+      if (r && r.moved){
+        if (typeof clearSelection_ === "function") clearSelection_();
+        multiSelectMode = false;
+        fetchAll();
+        showOkDialog_(t("chMovedTitle"), [{ text: t("chMovedBody", { old: oldId, "new": newId }) }]);
+      } else {
+        showOkDialog_(t("chSentTitle"), [{ text: t("chSentBody"), note: true }]);
+      }
+    }).catch(function(err){
+      btn.disabled = false; btn.textContent = t("chSubmit");
+      var msg = String((err && err.message) || "");
+      $("chErr").textContent = /booking not found/i.test(msg) ? t("chErrNotFound")
+        : /not available/i.test(msg) ? t("chErrNotAvail")
+        : /too many/i.test(msg) ? t("chErrTooMany")
+        : t("saveFailedRetry") + (msg ? " (" + msg + ")" : "");
+      if (/not available/i.test(msg)) fetchAll();
+    });
+  });
+
+  function showOkDialog_(title, lines){
+    $("okTitle").textContent = title;
+    $("okLines").innerHTML = lines.map(function(l){ return '<div class="'+(l.note ? "ok-note" : "")+'">'+esc(l.text)+'</div>'; }).join("");
+    openSheet("scrimOk");
+  }
+  $("btnOkClose").addEventListener("click", function(){ closeSheet("scrimOk"); });
+  $("scrimOk").addEventListener("click", function(e){ if (e.target.id === "scrimOk") closeSheet("scrimOk"); });
+  function showBookingOk_(ids, total, hasSlip, skipped){
+    var lines = [{ text: t("okTablesFmt", { ids: ids.join(", ") }) }, { text: t("okAmountFmt", { amount: fmtPrice(total) }) },
+                 { text: t(hasSlip ? "okSlipSent" : "okSlipLater"), note: true }];
+    if (skipped && skipped.length) lines.push({ text: t("okSkippedFmt", { ids: skipped.join(", ") }), note: true });
+    showOkDialog_(t("okTitle"), lines);
+  }
 
   /* =========================================================
      ADMIN — table editor sheet
@@ -2920,8 +3208,8 @@
     var newSlipFile = $("beSlipFile").files[0] || null;
     var scanP = newSlipFile ? scanSlipQr_(newSlipFile).catch(function(){ return { found:false, slip:false }; }) : Promise.resolve(null);
     var newLogoFile = $("beLogoFile").files[0] || null;
-    Promise.all([prepareFile_(newSlipFile, SLIP_MAX_SIDE, SLIP_QUALITY), prepareFile_(newLogoFile)]).then(function(res){
-      var newSlipUrl = res[0], newLogoUrl = res[1];
+    Promise.all([prepareUpload_(newSlipFile, "slip"), prepareUpload_(newLogoFile, "logo")]).then(function(res){
+      var newSlipUrl = res[0] && res[0].dataUrl, newLogoUrl = res[1] && res[1].dataUrl;
       var slipData = newSlipUrl ? { dataUrl: newSlipUrl, filename: newSlipFile.name } : (booking.slipData || null);
       var logoData = newLogoUrl ? { dataUrl: newLogoUrl, filename: newLogoFile.name } : (booking.logoData || null);
       var hasPower = $("bePower").checked;
@@ -3008,8 +3296,8 @@
     if (bookings[newTableId]){ toast(t("tableAlreadyBooked")); renderPickerHotspots_(oldTableId); return; }
     var newSlipFile = $("beSlipFile").files[0] || null;
     var newLogoFile = $("beLogoFile").files[0] || null;
-    Promise.all([prepareFile_(newSlipFile, SLIP_MAX_SIDE, SLIP_QUALITY), prepareFile_(newLogoFile)]).then(function(res){
-      var newSlipUrl = res[0], newLogoUrl = res[1];
+    Promise.all([prepareUpload_(newSlipFile, "slip"), prepareUpload_(newLogoFile, "logo")]).then(function(res){
+      var newSlipUrl = res[0] && res[0].dataUrl, newLogoUrl = res[1] && res[1].dataUrl;
       var slipData = newSlipUrl ? { dataUrl: newSlipUrl, filename: newSlipFile.name } : (booking.slipData || null);
       var logoData = newLogoUrl ? { dataUrl: newLogoUrl, filename: newLogoFile.name } : (booking.logoData || null);
       var hasPower = $("bePower").checked;
@@ -3062,6 +3350,30 @@
                      "025":"BAY", "030":"GSB", "033":"GHB", "034":"BAAC", "066":"ISBT", "067":"TISCO", "069":"KKP", "070":"ICBC", "071":"TCRB", "073":"LH Bank" };
   function bankLabel_(code){ return code ? (BANK_CODES[code] || code) : ""; }
   function slipsForTable_(id){ return slipsData.filter(function(sl){ return (sl.tableIds || []).indexOf(id) > -1; }); }
+  // Back-office completeness of one booking: "!" until the slip is verified and covers the price,
+  // the logo is in and any duplicate was reviewed; then a green tick.
+  function bookingIssues_(b){
+    var issues = [], id = b.tableId, sl = slipsForTable_(id);
+    if (!sl.length && !b.hasSlip){ issues.push(t("issNoSlip")); }
+    else if (sl.length){
+      if (sl.some(function(x){ return x.status === "rejected" || x.status === "mismatch"; })) issues.push(t("issSlipBad"));
+      else if (!sl.some(function(x){ return x.status === "verified"; })) issues.push(t("issSlipUnchecked"));
+      var best = null;
+      sl.forEach(function(x){ if (x.status !== "rejected" && x.expectedAmount != null && (best === null || x.amount > best.amount)) best = x; });
+      if (best && best.amount != null && Number(best.amount) < Number(best.expectedAmount) - 0.5){
+        issues.push(t("issShort", { n: fmtPrice(Number(best.expectedAmount) - Number(best.amount)) }));
+      }
+    } else issues.push(t("issSlipUnchecked"));
+    if (!(b.hasLogo || b.logoData)) issues.push(t("issNoLogo"));
+    if (b.dupOf && b.dupOf.length && !b.dupReviewed) issues.push(t("issDup"));
+    return issues;
+  }
+  function completenessHtml_(b){
+    var iss = bookingIssues_(b);
+    return iss.length
+      ? '<span class="status-badge st-warn" title="'+esc(t("chkWarnTitle")+": "+iss.join(" · "))+'">!</span>'
+      : '<span class="status-badge st-done" title="'+esc(t("chkOk"))+'">✓</span>';
+  }
   function slipFlagHtml_(id){
     var dup = slipsForTable_(id).some(function(sl){ return sl.duplicateOf && sl.status !== "rejected"; });
     return dup ? '<span class="status-badge st-dup">'+esc(t("slipDuplicate"))+'</span>' : '';
@@ -3128,11 +3440,25 @@
         '<div class="field"><label>'+esc(t("slipVerdict"))+'</label><select data-f="status">'+opts+'</select></div>'+
         '<div class="field"><label>'+esc(t("slipNote"))+'</label><input type="text" maxlength="200" data-f="note" value="'+esc(sl.note || "")+'" /></div>'+
         '<label class="check-row"><input type="checkbox" data-f="paid" /><span class="cr-text">'+esc(t("slipMarkPaid"))+'</span></label>'+
+        '<div class="field"><label>'+esc(t("slipLinkLabel"))+'</label><input type="text" maxlength="120" data-f="link" placeholder="S24, S25" /></div>'+
+        '<button type="button" class="btn btn-sm" data-slip-link>'+esc(t("slipLinkBtn"))+'</button> '+
         '<button type="button" class="btn btn-sm btn-accent" data-slip-save>'+esc(t("slipSaveBtn"))+'</button>'+
       '</div>';
     }).join("");
   }
   $("beSlipReview").addEventListener("click", function(e){
+    var linkBtn = e.target.closest ? e.target.closest("[data-slip-link]") : null;
+    if (linkBtn){
+      var lc = linkBtn.closest(".slip-card");
+      var wanted = lc.querySelector('[data-f="link"]').value.split(/[,\s]+/).map(findTableId_).filter(Boolean);
+      if (!wanted.length) return;
+      linkBtn.disabled = true;
+      _rpc("admin_link_slip", { p_slip_id: lc.dataset.slip, p_table_ids: wanted }).then(function(){ return fetchAll(); }).then(function(){
+        linkBtn.disabled = false; toast(t("slipLinked"));
+        if (currentBookingEditId) renderSlipReview_(currentBookingEditId);
+      }).catch(function(err){ linkBtn.disabled = false; console.error("mayucard6: link slip failed", err); toast(t("saveFailedRetry")); });
+      return;
+    }
     var btn = e.target.closest ? e.target.closest("[data-slip-save]") : null;
     if (!btn) return;
     var card = btn.closest(".slip-card");
@@ -3160,6 +3486,43 @@
     });
   });
 
+  function dupBadgeHtml_(b){
+    if (!b || !b.dupOf || !b.dupOf.length) return "";
+    var tip = b.dupConfirmed ? t("dupBadgeConfirmed") : t("dupBadgeUnconfirmed");
+    return '<span class="status-badge st-dup" title="'+esc(tip)+'">'+esc(t("dupBadgeFmt", { tables: b.dupOf.join(", ") }))+'</span>';
+  }
+
+  function renderChangesPanel(){
+    var head = $("changesSectionHead"), panel = $("changesPanel");
+    if (!isAdmin || frontDeskMode){ head.hidden = true; panel.hidden = true; return; }
+    head.hidden = false; panel.hidden = false;
+    var labels = { pending: t("changePending"), approved: t("changeApproved"), rejected: t("changeRejected"), auto_moved: t("changeAuto") };
+    var chk = function(ok, key){ return '<span class="'+(ok ? "chg-yes" : "chg-no")+'">'+(ok ? "✓ " : "✗ ")+esc(t(key))+'</span>'; };
+    panel.innerHTML = changeRequests.map(function(c){
+      var cls = c.status === "pending" ? "st-pending" : (c.status === "rejected" ? "st-cancelled" : "st-confirmed");
+      var url = safeUrl_(c.fileUrl);
+      var actions = c.status === "pending"
+        ? '<div class="chg-actions"><button type="button" class="btn btn-sm btn-accent" data-chg-ok="'+esc(c.id)+'"'+((c.oldExists && c.newFree) ? "" : " disabled")+'>'+esc(t("changeApprove"))+'</button>'+
+          '<button type="button" class="btn btn-sm" data-chg-no="'+esc(c.id)+'">'+esc(t("changeReject"))+'</button></div>' : "";
+      return '<div class="chg-row">'+
+        '<div class="chg-head"><span class="mono">'+esc(c.oldTable)+' → '+esc(c.newTable)+'</span><span>'+esc(c.shop || c.bookingShop || "")+'</span>'+
+          '<span class="status-badge '+cls+'">'+esc(labels[c.status] || c.status)+'</span></div>'+
+        '<div class="chg-meta chg-checks">'+chk(c.dataOk, "chkData")+chk(c.slipOk, "chkSlip")+chk(c.priceOk, "chkPrice")+
+          (url ? ' <a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(t("changeSlipFile"))+'</a>' : "")+'</div>'+
+        '<div class="chg-meta">'+esc(fmtDateTime_(c.createdAt))+(c.reason ? " · "+esc(c.reason) : "")+'</div>'+
+        actions+'</div>';
+    }).join("") || '<div class="empty-state">'+esc(t("changesEmpty"))+'</div>';
+  }
+  $("changesPanel").addEventListener("click", function(e){
+    var ok = e.target.closest ? e.target.closest("[data-chg-ok]") : null, no = e.target.closest ? e.target.closest("[data-chg-no]") : null;
+    var btn = ok || no;
+    if (!btn) return;
+    btn.disabled = true;
+    _rpc("admin_decide_change", { p_id: btn.getAttribute(ok ? "data-chg-ok" : "data-chg-no"), p_approve: !!ok, p_note: null })
+      .then(function(){ return fetchAll(); }).then(function(){ toast(t("changeDecided")); })
+      .catch(function(err){ console.error("mayucard6: change decision failed", err); btn.disabled = false; toast(t("changeFailed")); });
+  });
+
   function renderBookingsPanel(){
     var head = $("bookingsSectionHead"), filters = $("bookingFilters"), panel = $("bookingsPanel");
     if (!isAdmin || frontDeskMode){ head.hidden = true; filters.hidden = true; panel.hidden = true; return; }
@@ -3180,6 +3543,8 @@
       return true;
     }).sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
 
+    var okN = list.filter(function(b){ return !bookingIssues_(b).length; }).length;
+    $("bookingsSectionTitle").textContent = localizedText_(config.bookingsSectionTitle) + " · " + t("issSummaryFmt", { ok: okN, bad: list.length - okN });
     panel.innerHTML = list.map(function(b){
       var tbl = tables[b.tableId];
       var z = tbl ? zones[tbl.zoneKey] : null;
@@ -3191,6 +3556,8 @@
           '<div class="br-meta">'+(z?esc(localizedText_(z.label)):"")+' · '+fmtPrice(b.price)+' · '+esc(b.phone||"")+'</div>'+
         '</div>'+
         slipFlagHtml_(b.tableId)+
+        dupBadgeHtml_(b)+
+        completenessHtml_(b)+
         '<span class="status-badge st-'+esc(b.status||"pending")+'">'+statusLabel_(b.status)+'</span>'+
         '<span class="br-table mono">'+esc(b.tableId)+'</span>'+
       '</div>';

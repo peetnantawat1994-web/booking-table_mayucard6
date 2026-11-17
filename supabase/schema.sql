@@ -166,7 +166,7 @@ create or replace function public.create_booking(p_table_id text, p_data jsonb) 
 language plpgsql volatile security definer set search_path = public as $$
 declare v jsonb; s jsonb;
 begin
-  v := public._clean_booking(p_table_id, p_data, null);
+  v := public._stamp_dups(public._clean_booking(p_table_id, p_data, null), p_data, null);
   insert into public.documents (store, collection, id, data)
   values ('live', 'bookings', p_table_id, v)
   on conflict (store, collection, id) do nothing;   -- the primary key makes double-booking impossible
@@ -192,7 +192,7 @@ begin
       skipped := skipped || coalesce(tid, '?');
       continue;
     end if;
-    v := public._clean_booking(tid, item->'data', g);
+    v := public._stamp_dups(public._clean_booking(tid, item->'data', g), item->'data', g);
     insert into public.documents (store, collection, id, data)
     values ('live', 'bookings', tid, v)
     on conflict (store, collection, id) do nothing;
@@ -225,6 +225,7 @@ begin
     'tables',   public._docs('draft', 'tables'),
     'bookings', public._docs('live', 'bookings'),          -- always the real, current bookings
     'slips',    public._slips_json(),
+    'changeRequests', public._change_requests_json(),
     'config', jsonb_build_object(
       'settings',     public._doc('draft', 'config', 'settings'),
       'customFields', public._doc('draft', 'config', 'customFields')
@@ -437,6 +438,203 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+
+-- ---------------------------------------------------------------------
+-- DUPLICATE BOOKINGS + BOOKING CHANGES
+-- ---------------------------------------------------------------------
+create or replace function public._norm_text(s text) returns text
+language sql immutable as $$
+  select regexp_replace(lower(btrim(coalesce(s, ''))), '\s+', '', 'g');
+$$;
+create or replace function public._norm_phone(s text) returns text
+language sql immutable as $$
+  select regexp_replace(coalesce(s, ''), '\D', '', 'g');
+$$;
+
+-- Which existing bookings share the shop, phone, email or (3+ letter) contact
+-- name with this one? Returns table ids + which fields matched. Internal only:
+-- the browser gets just a yes/no from check_duplicate().
+create or replace function public._find_dups(p_shop text, p_contact text, p_phone text, p_email text, p_exclude_group uuid default null)
+returns table (table_id text, fields text[])
+language sql stable security definer set search_path = public as $$
+  select m.id, m.f from (
+    select b.id,
+           array_remove(array[
+             case when public._norm_text(p_shop) <> '' and public._norm_text(b.data->>'shop') = public._norm_text(p_shop) then 'shop' end,
+             case when length(public._norm_phone(p_phone)) >= 8 and public._norm_phone(b.data->>'phone') = public._norm_phone(p_phone) then 'phone' end,
+             case when public._norm_text(p_email) <> '' and public._norm_text(b.data->>'email') = public._norm_text(p_email) then 'email' end,
+             case when length(public._norm_text(p_contact)) >= 3 and public._norm_text(b.data->>'contact') = public._norm_text(p_contact) then 'contact' end
+           ], null) as f
+    from public.documents b
+    where b.store = 'live' and b.collection = 'bookings'
+      and (p_exclude_group is null or b.data->>'groupId' is distinct from p_exclude_group::text)
+  ) m
+  where cardinality(m.f) > 0
+  order by m.id;
+$$;
+
+-- yes/no for the booking form: has this shop/contact/phone/email booked before?
+create or replace function public.check_duplicate(p_shop text, p_contact text, p_phone text, p_email text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'duplicate', exists (select 1 from public._find_dups(p_shop, p_contact, p_phone, p_email)),
+    'fields',    coalesce((select jsonb_agg(distinct f) from public._find_dups(p_shop, p_contact, p_phone, p_email) d, unnest(d.fields) f), '[]'::jsonb)
+  );
+$$;
+
+-- remember (for the admin) which earlier bookings a new booking overlaps with
+create or replace function public._stamp_dups(v jsonb, p_data jsonb, p_group uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare ids text[]; flds text[];
+begin
+  select coalesce(array_agg(d.table_id order by d.table_id), '{}'), coalesce(array(select distinct f from public._find_dups(v->>'shop', v->>'contact', v->>'phone', v->>'email', p_group) d2, unnest(d2.fields) f), '{}')
+    into ids, flds
+    from public._find_dups(v->>'shop', v->>'contact', v->>'phone', v->>'email', p_group) d;
+  if cardinality(ids) = 0 then return v; end if;
+  return v || jsonb_build_object('dupOf', to_jsonb(ids), 'dupFields', to_jsonb(flds),
+                                 'dupConfirmed', coalesce(p_data->>'dupConfirmed' = 'true', false));
+end $$;
+
+create table if not exists public.change_requests (
+  id          uuid primary key default gen_random_uuid(),
+  old_table   text not null,
+  new_table   text not null,
+  shop        text, contact text, phone text, email text,
+  bank_code   text, trans_ref text, file_url text,
+  data_ok     boolean not null default false,
+  slip_ok     boolean not null default false,
+  price_ok    boolean not null default false,
+  status      text not null default 'pending' check (status in ('pending','approved','rejected','auto_moved')),
+  reason      text,
+  note        text,
+  created_at  timestamptz not null default now(),
+  reviewed_by uuid,
+  reviewed_at timestamptz
+);
+alter table public.change_requests enable row level security;
+revoke all on public.change_requests from anon, authenticated;
+
+-- price a table would have for this booking (zone/table price + power fee)
+create or replace function public._price_for(p_table_id text, p_has_power boolean) returns numeric
+language plpgsql stable security definer set search_path = public as $$
+declare t jsonb; z jsonb;
+begin
+  t := public._doc('live', 'tables', p_table_id);
+  if t is null then return null; end if;
+  z := public._doc('live', 'zones', t->>'zoneKey');
+  return coalesce(public._num(t->>'price'), public._num(z->>'price'), 0) + case when p_has_power then 500 else 0 end;
+end $$;
+
+-- move one booking to another free table (keeps everything else, fixes the price and the slips)
+create or replace function public._move_booking(p_old text, p_new text) returns void
+language plpgsql volatile security definer set search_path = public as $$
+declare b jsonb; nb jsonb; now_txt text; price numeric;
+begin
+  b := public._doc('live', 'bookings', p_old);
+  if b is null then raise exception 'booking not found'; end if;
+  if p_old = p_new then raise exception 'same table'; end if;
+  price := public._price_for(p_new, coalesce(b->'hasPower' = 'true'::jsonb, false));
+  if price is null then raise exception 'new table not available'; end if;
+  now_txt := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+  nb := b || jsonb_build_object('tableId', p_new, 'price', price, 'updatedAt', now_txt, 'movedFrom', p_old, 'movedAt', now_txt);
+  insert into public.documents (store, collection, id, data)
+  values ('live', 'bookings', p_new, nb)
+  on conflict (store, collection, id) do nothing;
+  if not found then raise exception 'new table not available'; end if;
+  delete from public.documents where store = 'live' and collection = 'bookings' and id = p_old;
+  update public.slips set table_ids = array_replace(table_ids, p_old, p_new) where p_old = any (table_ids);
+end $$;
+
+-- A customer asks to move their booking. It is moved automatically ONLY when
+--   * the shop/contact/phone/email match the booking,
+--   * the slip QR reference matches a slip stored for that booking, and
+--   * the new table costs the same.
+-- Anything else becomes a request for an admin to approve.
+create or replace function public.request_booking_change(p_old text, p_new text, p_data jsonb, p_slip jsonb, p_file jsonb) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare
+  b jsonb; d_ok boolean; s_ok boolean := false; p_ok boolean; reason text[] := '{}';
+  v_bank text := nullif(btrim(p_slip->>'bankCode'), ''); v_ref text := nullif(btrim(p_slip->>'transRef'), '');
+  v_file jsonb := public._clean_file(p_file); v_id uuid; new_price numeric; pend int;
+begin
+  b := public._doc('live', 'bookings', p_old);
+  if b is null then raise exception 'booking not found'; end if;
+  if public._doc('live', 'tables', p_new) is null or public._doc('live', 'bookings', p_new) is not null then
+    raise exception 'new table not available';
+  end if;
+  select count(*) into pend from public.change_requests where old_table = p_old and status = 'pending';
+  if pend >= 5 then raise exception 'too many pending requests'; end if;
+  d_ok := public._norm_text(p_data->>'shop') = public._norm_text(b->>'shop')
+      and public._norm_text(p_data->>'contact') = public._norm_text(b->>'contact')
+      and public._norm_text(p_data->>'email') = public._norm_text(b->>'email')
+      and length(public._norm_phone(p_data->>'phone')) >= 8
+      and public._norm_phone(p_data->>'phone') = public._norm_phone(b->>'phone');
+  if v_bank is not null and v_bank ~ '^[0-9]{3}$' and v_ref is not null and v_ref ~ '^[A-Za-z0-9]{10,40}$' then
+    s_ok := exists (select 1 from public.slips where p_old = any (table_ids) and bank_code = v_bank and trans_ref = v_ref);
+  else v_bank := null; v_ref := null; end if;
+  new_price := public._price_for(p_new, coalesce(b->'hasPower' = 'true'::jsonb, false));
+  p_ok := new_price is not distinct from public._num(b->>'price');
+  if not d_ok then reason := reason || 'data does not match the booking'::text; end if;
+  if not s_ok then reason := reason || 'slip not matched'::text; end if;
+  if not p_ok then reason := reason || 'price differs'::text; end if;
+  insert into public.change_requests (old_table, new_table, shop, contact, phone, email, bank_code, trans_ref, file_url,
+                                      data_ok, slip_ok, price_ok, status, reason)
+  values (p_old, p_new, left(p_data->>'shop', 80), left(p_data->>'contact', 60), left(p_data->>'phone', 20), left(p_data->>'email', 120),
+          v_bank, v_ref, v_file->>'dataUrl', d_ok, s_ok, p_ok,
+          case when d_ok and s_ok and p_ok then 'auto_moved' else 'pending' end, array_to_string(reason, '; '))
+  returning id into v_id;
+  if d_ok and s_ok and p_ok then
+    perform public._move_booking(p_old, p_new);
+    return jsonb_build_object('ok', true, 'moved', true, 'requestId', v_id, 'newTable', p_new);
+  end if;
+  return jsonb_build_object('ok', true, 'moved', false, 'requestId', v_id);
+end $$;
+
+create or replace function public._change_requests_json() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', c.id, 'oldTable', c.old_table, 'newTable', c.new_table, 'shop', c.shop, 'contact', c.contact,
+    'phone', c.phone, 'email', c.email, 'bankCode', c.bank_code, 'transRef', c.trans_ref, 'fileUrl', c.file_url,
+    'dataOk', c.data_ok, 'slipOk', c.slip_ok, 'priceOk', c.price_ok, 'status', c.status, 'reason', c.reason,
+    'note', c.note, 'createdAt', c.created_at, 'reviewedAt', c.reviewed_at,
+    'bookingShop', (select b.data->>'shop' from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = c.old_table),
+    'oldExists', exists (select 1 from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = c.old_table),
+    'newFree', not exists (select 1 from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = c.new_table)
+  ) order by (c.status <> 'pending'), c.created_at desc), '[]'::jsonb)
+  from public.change_requests c;
+$$;
+
+create or replace function public.admin_decide_change(p_id uuid, p_approve boolean, p_note text default null) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare c public.change_requests;
+begin
+  perform public._require_admin();
+  select * into c from public.change_requests where id = p_id for update;
+  if not found then raise exception 'request not found'; end if;
+  if c.status <> 'pending' then raise exception 'request already decided'; end if;
+  if p_approve then perform public._move_booking(c.old_table, c.new_table); end if;
+  update public.change_requests
+     set status = case when p_approve then 'approved' else 'rejected' end, note = left(p_note, 500),
+         reviewed_by = auth.uid(), reviewed_at = now()
+   where id = p_id;
+  return jsonb_build_object('ok', true, 'status', case when p_approve then 'approved' else 'rejected' end);
+end $$;
+
+-- one transfer slip paid for several bookings: link it to more tables (the expected amount becomes their total)
+create or replace function public.admin_link_slip(p_slip_id uuid, p_table_ids text[]) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare s public.slips; ids text[]; total numeric;
+begin
+  perform public._require_admin();
+  select * into s from public.slips where id = p_slip_id for update;
+  if not found then raise exception 'slip not found'; end if;
+  select array(select distinct x from unnest(s.table_ids || p_table_ids) x order by x) into ids;
+  select coalesce(sum(public._num(d.data->>'price')), 0) into total
+    from public.documents d where d.store = 'live' and d.collection = 'bookings' and d.id = any (ids);
+  update public.slips set table_ids = ids, expected_amount = total where id = p_slip_id;
+  return jsonb_build_object('ok', true, 'tableIds', to_jsonb(ids), 'expectedAmount', total);
+end $$;
+
 -- ---------------------------------------------------------------------
 -- who may call what
 -- ---------------------------------------------------------------------
@@ -453,15 +651,19 @@ grant execute on function public.reset_draft_from_live()                to authe
 grant execute on function public.admin_review_slip(uuid, text, numeric, timestamptz, text, boolean) to authenticated;
 grant execute on function public.admin_attach_slip(text, jsonb, jsonb)  to authenticated;
 grant execute on function public.admin_retarget_slips(text, text)       to authenticated;
+grant execute on function public.check_duplicate(text, text, text, text)  to anon, authenticated;
+grant execute on function public.request_booking_change(text, text, jsonb, jsonb, jsonb) to anon, authenticated;
+grant execute on function public.admin_decide_change(uuid, boolean, text) to authenticated;
+grant execute on function public.admin_link_slip(uuid, text[])           to authenticated;
 
 -- ---------------------------------------------------------------------
 -- file uploads (slip / logo / payment QR) — Supabase Storage
 -- Public bucket: files are readable by their (random, unguessable) URL,
 -- like the old "anyone with the link" Drive files. Nobody can list or
--- overwrite them; anyone can add an image up to 5 MB.
+-- overwrite them; anyone can add an image up to 10 MB.
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('uploads', 'uploads', true, 5242880, array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+values ('uploads', 'uploads', true, 10485760, array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 on conflict (id) do update
   set public = excluded.public,
       file_size_limit = excluded.file_size_limit,
