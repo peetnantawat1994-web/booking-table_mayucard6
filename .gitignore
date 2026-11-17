@@ -4,3 +4,5 @@ supabase/seed-data.sql
 ._*
 node_modules/
 supabase/.temp/
+supabase/migration*.sql
+*uploads-map*.json
