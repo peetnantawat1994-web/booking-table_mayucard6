@@ -3385,11 +3385,9 @@
     else if (sl.length){
       if (sl.some(function(x){ return x.status === "rejected" || x.status === "mismatch"; })) issues.push(t("issSlipBad"));
       else if (!sl.some(function(x){ return x.status === "verified"; })) issues.push(t("issSlipUnchecked"));
-      var best = null;
-      sl.forEach(function(x){ if (x.status !== "rejected" && x.expectedAmount != null && (best === null || x.amount > best.amount)) best = x; });
-      if (best && best.amount != null && Number(best.amount) < Number(best.expectedAmount) - 0.5){
-        issues.push(t("issShort", { n: fmtPrice(Number(best.expectedAmount) - Number(best.amount)) }));
-      }
+      var paid = 0, need = 0;   // several slips may pay for one booking: add them up
+      sl.forEach(function(x){ if (x.status !== "rejected" && x.amount != null){ paid += Number(x.amount); } if (x.expectedAmount != null) need = Math.max(need, Number(x.expectedAmount)); });
+      if (need && paid < need - 0.5){ issues.push(t("issShort", { n: fmtPrice(need - paid) })); }
     } else issues.push(t("issSlipUnchecked"));
     if (!(b.hasLogo || b.logoData)) issues.push(t("issNoLogo"));
     if (b.dupOf && b.dupOf.length && !b.dupReviewed) issues.push(t("issDup"));
