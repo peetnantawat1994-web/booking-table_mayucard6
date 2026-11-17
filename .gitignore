@@ -1,0 +1,5 @@
+# holds customers' contact details — never commit
+supabase/seed-data.sql
+.DS_Store
+._*
+node_modules/

@@ -1,0 +1,28 @@
+# Every time `main` (production) changes, tag the version that was live just
+# before it as backup/<date>-<commit>. Rolling back = deploy that tag again.
+name: Backup previous production
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag-previous:
+    runs-on: ubuntu-latest
+    # the very first push has no previous version to back up
+    if: github.event.before != '0000000000000000000000000000000000000000'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag the version that was live before this push
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          TAG="backup/$(date -u +%Y%m%d-%H%M%S)-${BEFORE:0:7}"
+          git tag "$TAG" "$BEFORE"
+          git push origin "$TAG"
+          echo "Backed up previous production as $TAG" >> "$GITHUB_STEP_SUMMARY"
