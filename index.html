@@ -469,6 +469,17 @@
   .file-row .file-info b{display:block; font-size:13px; color:var(--ink); font-weight:600;}
   .file-replace{font-size:12px; color:var(--ink-soft); margin-top:5px;}
 
+  .slip-scan{font-size:12.5px; margin-top:7px; color:var(--ink-soft); line-height:1.4;}
+  .slip-scan.ok{color:var(--good);} .slip-scan.warn{color:var(--warn);}
+  .slip-card{border:1px solid var(--line); border-radius:var(--r-md); padding:12px; margin-top:10px; background:var(--surface-2);}
+  .slip-card .slip-head{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:13px; font-weight:600;}
+  .slip-card .slip-meta{font-size:12px; color:var(--ink-soft); margin:5px 0 8px;}
+  .slip-card .slip-warn{font-size:12.5px; color:var(--bad); background:var(--bad-soft); border-radius:var(--r-sm); padding:7px 10px; margin-bottom:8px;}
+  .slip-card .field{margin-bottom:9px;}
+  .slip-rank{min-width:26px; height:26px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:12px; display:flex; align-items:center; justify-content:center; flex:none;}
+  .status-badge.st-verified{background:var(--good-soft); color:var(--good);}
+  .status-badge.st-mismatch{background:var(--warn-soft); color:var(--warn);}
+  .status-badge.st-rejected, .status-badge.st-dup{background:var(--bad-soft); color:var(--bad);}
   .toast{
     position:fixed; left:50%; bottom:calc(max(20px, env(safe-area-inset-bottom,0px) + 10px) + var(--badge-space)); transform:translate(-50%,10px);
     background:var(--ink); color:var(--bg); font-size:13px; font-weight:600; padding:11px 18px; border-radius:16px;
@@ -574,6 +585,12 @@
   </div>
   <div id="bookingsPanel" hidden></div>
 
+  <div class="section-head" id="slipsSectionHead" hidden>
+    <h2 id="slipsSectionTitle" data-i18n="slipsSectionTitle">ลำดับการโอน (สลิป)</h2>
+  </div>
+  <div class="section-hint" id="slipsSectionHint" hidden data-i18n="slipsHint"></div>
+  <div id="slipsPanel" hidden></div>
+
   <div class="section-head" id="zonesSectionHead" hidden>
     <h2 id="zonesSectionTitle">จัดการโซน</h2>
     <button class="btn btn-sm" id="btnAddZone" data-i18n="addZoneBtn">+ เพิ่มโซน</button>
@@ -657,6 +674,7 @@
           <div class="preview" id="bkSlipPreview">SLIP</div>
           <input type="file" id="bkSlipFile" accept="image/*" />
         </div>
+        <div class="slip-scan" id="bkSlipScan" aria-live="polite"></div>
       </div>
       <div class="field">
         <label data-i18n="labelLogoOptional">โลโก้ร้าน (ไม่บังคับ)</label>
@@ -750,6 +768,7 @@
       <label data-i18n="labelSlip">สลิปโอนเงิน</label>
       <div id="beSlipCurrent"></div>
       <input type="file" id="beSlipFile" accept="image/*" class="file-replace" />
+      <div id="beSlipReview"></div>
     </div>
     <div class="field">
       <label data-i18n="labelLogo">โลโก้ร้าน</label>
@@ -984,6 +1003,8 @@
   var tables = {};     // id -> {id,zoneKey,x,y,w,h}
   var bookings = {};   // tableId -> {tableId,shop,contact,phone,email,line,category,note,hasPower,powerFee,price,status,hasSlip,hasLogo,slipData,logoData,createdAt,updatedAt,custom}
   var currentBookingEditId = null;
+  var slipsData = [];      // admin only: every slip, already in transfer order (from get_admin_state)
+  var bkSlipScan_ = null;  // QR scan of the slip currently chosen in the booking form: {file, promise}
   var DEFAULT_CONFIG = {
     eventName:"MAYUCARD 6", tagline:"Trading Card Convention",
     heroEyebrow:"จองพื้นที่บูท",
@@ -1188,7 +1209,18 @@
       bookingSkippedFmt:" · ยกเว้น {n} โต๊ะที่เพิ่งถูกจองไปก่อนหน้า ({ids})", bookingSuccessSingleFmt:"จองโต๊ะ {id} สำเร็จ — รอตรวจสอบสลิป",
       tableSavedFmt:"บันทึกโต๊ะ {id} แล้ว", tableDeletedFmt:"ลบโต๊ะ {id} แล้ว", tableReleasedFmt:"ปล่อยโต๊ะ {id} ให้ว่างแล้ว",
       bookingSavedFmt:"บันทึกการจองโต๊ะ {id} แล้ว", tableMovedFmt:"ย้ายโต๊ะจาก {old} ไปที่ {new} สำเร็จ",
-      tableMoveFailed:"ย้ายโต๊ะไม่สำเร็จ ลองใหม่อีกครั้ง", releaseConfirmFmt:"ปล่อยโต๊ะ {id} และลบข้อมูลการจองนี้?", supabaseNotSet:"ยังไม่ได้ตั้งค่า Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"บัญชีนี้ไม่ใช่แอดมิน", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง",
+      tableMoveFailed:"ย้ายโต๊ะไม่สำเร็จ ลองใหม่อีกครั้ง", releaseConfirmFmt:"ปล่อยโต๊ะ {id} และลบข้อมูลการจองนี้?",
+      slipQrReading:"กำลังอ่าน QR บนสลิป…", slipQrOk:"✓ อ่าน QR สลิปได้ (เก็บเลขอ้างอิงไว้ป้องกันการใช้สลิปซ้ำ)",
+      slipQrOther:"พบ QR แต่ไม่ใช่ QR ของสลิปโอนเงิน — ยังจองได้ ทีมงานจะตรวจสลิปเอง",
+      slipQrNone:"ไม่พบ QR บนรูป — ยังจองได้ ทีมงานจะตรวจสลิปเอง (ถ้าถ่ายให้เห็น QR ชัด ๆ จะตรวจได้เร็วขึ้น)",
+      slipsSectionTitle:"ลำดับการโอน (สลิป)",
+      slipsHint:"เรียงตามเวลาโอนที่แอดมินกรอกจากสลิป ส่วนสลิปที่ยังไม่ระบุเวลาโอนเรียงตามเวลาที่ส่งเข้าระบบ (เซิร์ฟเวอร์เป็นผู้บันทึก) ระบบนี้ไม่ได้ตรวจกับธนาคาร จึงยืนยันไม่ได้ว่าสลิปเป็นของจริง",
+      slipStPending:"รอตรวจ", slipStVerified:"ตรวจแล้ว ถูกต้อง", slipStMismatch:"ยอดไม่ตรง", slipStRejected:"ไม่ผ่าน", slipDuplicate:"สลิปซ้ำ",
+      slipDuplicateWarnFmt:"⚠ เลขอ้างอิงนี้เคยใช้กับโต๊ะ {tables} แล้ว", slipNoQr:"ไม่มี QR (ตรวจเอง)",
+      slipTransferTime:"เวลาโอนตามสลิป", slipAmountSeen:"ยอดที่เห็นในสลิป (บาท)", slipVerdict:"ผลการตรวจ", slipNote:"หมายเหตุ",
+      slipMarkPaid:"ทำเครื่องหมายว่า \"ชำระแล้ว\" ด้วย", slipSaveBtn:"บันทึกผลตรวจสลิป", slipSaved:"บันทึกผลตรวจสลิปแล้ว",
+      slipExpectedFmt:"ยอดที่ต้องโอน {amount}", slipUploadedFmt:"ส่งสลิป {time}", slipTransferredFmt:"โอน {time}", slipWaitingTime:"ยังไม่ระบุเวลาโอน",
+      slipReleased:"การจองถูกปล่อย/ย้ายแล้ว", slipsEmpty:"ยังไม่มีสลิป", slipAttachFailed:"บันทึกการจองแล้ว แต่บันทึกข้อมูลสลิปไม่สำเร็จ", supabaseNotSet:"ยังไม่ได้ตั้งค่า Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"บัญชีนี้ไม่ใช่แอดมิน", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง",
       pleaseEnterZoneName:"กรอกชื่อโซน", zoneSaved:"บันทึกโซนแล้ว", zoneDeleteBlocked:"ลบไม่ได้ เพราะยังมีโต๊ะใช้โซนนี้อยู่",
       zoneDeleted:"ลบโซนแล้ว", pleaseEnterFieldName:"กรอกชื่อฟิลด์", pleaseEnterOneOption:"กรอกตัวเลือกอย่างน้อย 1 รายการ",
       fieldSaved:"บันทึกฟิลด์แล้ว", fieldDeleted:"ลบฟิลด์แล้ว", settingsSaved:"บันทึกการตั้งค่าแล้ว",
@@ -1271,7 +1303,18 @@
       bookingSkippedFmt:" · excluding {n} tables just booked by someone else ({ids})", bookingSuccessSingleFmt:"Table {id} booked — awaiting slip review",
       tableSavedFmt:"Table {id} saved", tableDeletedFmt:"Table {id} deleted", tableReleasedFmt:"Table {id} released",
       bookingSavedFmt:"Booking for table {id} saved", tableMovedFmt:"Moved booking from table {old} to {new}",
-      tableMoveFailed:"Could not move the table — please try again", releaseConfirmFmt:"Release table {id} and delete this booking?", supabaseNotSet:"Supabase is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"This account is not an admin", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet",
+      tableMoveFailed:"Could not move the table — please try again", releaseConfirmFmt:"Release table {id} and delete this booking?",
+      slipQrReading:"Reading the slip's QR code…", slipQrOk:"✓ Slip QR read (its reference is saved so the same slip can't be used twice)",
+      slipQrOther:"A QR was found but it is not a bank-slip QR — you can still book, the team will check the slip by hand",
+      slipQrNone:"No QR found in the image — you can still book, the team will check the slip by hand (a sharper photo of the QR is quicker to check)",
+      slipsSectionTitle:"Transfer order (slips)",
+      slipsHint:"Sorted by the transfer time an admin entered from the slip; slips without one come after, by the time they reached the system (recorded by the server). This is not checked with the bank, so it cannot prove a slip is genuine.",
+      slipStPending:"To check", slipStVerified:"Verified", slipStMismatch:"Amount mismatch", slipStRejected:"Rejected", slipDuplicate:"Duplicate slip",
+      slipDuplicateWarnFmt:"⚠ This reference was already used for table(s) {tables}", slipNoQr:"No QR (check by hand)",
+      slipTransferTime:"Transfer time on the slip", slipAmountSeen:"Amount on the slip (THB)", slipVerdict:"Result", slipNote:"Note",
+      slipMarkPaid:"Also mark the booking as \"Paid\"", slipSaveBtn:"Save slip review", slipSaved:"Slip review saved",
+      slipExpectedFmt:"Due {amount}", slipUploadedFmt:"Slip sent {time}", slipTransferredFmt:"Transferred {time}", slipWaitingTime:"transfer time not entered",
+      slipReleased:"booking released/moved", slipsEmpty:"No slips yet", slipAttachFailed:"Booking saved, but the slip data could not be saved", supabaseNotSet:"Supabase is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"This account is not an admin", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet",
       pleaseEnterZoneName:"Please enter a zone name", zoneSaved:"Zone saved", zoneDeleteBlocked:"Can't delete — some tables still use this zone",
       zoneDeleted:"Zone deleted", pleaseEnterFieldName:"Please enter a field name", pleaseEnterOneOption:"Please enter at least one option",
       fieldSaved:"Field saved", fieldDeleted:"Field deleted", settingsSaved:"Settings saved",
@@ -1354,7 +1397,18 @@
       bookingSkippedFmt:" · 不含刚被他人预订的 {n} 桌（{ids}）", bookingSuccessSingleFmt:"{id} 号桌预订成功 — 待审核凭证",
       tableSavedFmt:"{id} 号桌已保存", tableDeletedFmt:"{id} 号桌已删除", tableReleasedFmt:"{id} 号桌已释放",
       bookingSavedFmt:"{id} 号桌的预订已保存", tableMovedFmt:"已将预订从 {old} 号桌移至 {new} 号桌",
-      tableMoveFailed:"更换桌位失败，请重试", releaseConfirmFmt:"释放 {id} 号桌并删除此预订？", supabaseNotSet:"尚未配置 Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"此账号不是管理员", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订",
+      tableMoveFailed:"更换桌位失败，请重试", releaseConfirmFmt:"释放 {id} 号桌并删除此预订？",
+      slipQrReading:"正在读取凭证二维码…", slipQrOk:"✓ 已读取凭证二维码（参考号已记录，防止重复使用）",
+      slipQrOther:"识别到二维码，但不是转账凭证二维码 — 仍可预订，工作人员会人工核对",
+      slipQrNone:"图片中未发现二维码 — 仍可预订，工作人员会人工核对（二维码拍清楚会更快）",
+      slipsSectionTitle:"转账顺序（凭证）",
+      slipsHint:"按管理员从凭证录入的转账时间排序；未录入的按凭证到达系统的时间排序（由服务器记录）。本功能未与银行核验，无法证明凭证真伪。",
+      slipStPending:"待核对", slipStVerified:"已核对", slipStMismatch:"金额不符", slipStRejected:"未通过", slipDuplicate:"重复凭证",
+      slipDuplicateWarnFmt:"⚠ 此参考号已用于 {tables} 号桌", slipNoQr:"无二维码（人工核对）",
+      slipTransferTime:"凭证上的转账时间", slipAmountSeen:"凭证金额（泰铢）", slipVerdict:"核对结果", slipNote:"备注",
+      slipMarkPaid:"同时标记预订为“已付款”", slipSaveBtn:"保存核对结果", slipSaved:"已保存核对结果",
+      slipExpectedFmt:"应付 {amount}", slipUploadedFmt:"凭证提交于 {time}", slipTransferredFmt:"转账于 {time}", slipWaitingTime:"尚未录入转账时间",
+      slipReleased:"预订已释放/更换", slipsEmpty:"暂无凭证", slipAttachFailed:"预订已保存，但凭证信息保存失败", supabaseNotSet:"尚未配置 Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"此账号不是管理员", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订",
       pleaseEnterZoneName:"请输入分区名称", zoneSaved:"分区已保存", zoneDeleteBlocked:"无法删除，仍有桌位使用此分区",
       zoneDeleted:"分区已删除", pleaseEnterFieldName:"请输入字段名称", pleaseEnterOneOption:"请至少输入一个选项",
       fieldSaved:"字段已保存", fieldDeleted:"字段已删除", settingsSaved:"设置已保存",
@@ -1492,6 +1546,113 @@
     if (table && table.price != null && table.price !== "") return Number(table.price);
     var z = zones[table ? table.zoneKey : null];
     return z ? Number(z.price||0) : 0;
+  }
+
+  /* =========================================================
+     SLIP QR — read the bank transaction reference from the QR code printed
+     on a Thai transfer slip, in the browser (jsQR is loaded only when a
+     slip is chosen). The reference is what lets the system notice the same
+     transfer being used twice. It does NOT prove the slip is genuine.
+  ========================================================= */
+  var JSQR_SRC = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+  var _jsQrP = null;
+  function loadJsQR_(){
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+    if (_jsQrP) return _jsQrP;
+    _jsQrP = new Promise(function(resolve, reject){
+      var el = document.createElement("script");
+      el.src = JSQR_SRC; el.async = true;
+      el.onload = function(){ window.jsQR ? resolve(window.jsQR) : reject(new Error("jsQR missing")); };
+      el.onerror = function(){ _jsQrP = null; reject(new Error("jsQR failed to load")); };
+      document.head.appendChild(el);
+    });
+    return _jsQrP;
+  }
+  // CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) as used by EMV / PromptPay style QR payloads
+  function crc16ccitt_(str){
+    var crc = 0xFFFF;
+    for (var i = 0; i < str.length; i++){
+      crc ^= (str.charCodeAt(i) & 0xFF) << 8;
+      for (var b = 0; b < 8; b++) crc = (crc & 0x8000) ? (((crc << 1) ^ 0x1021) & 0xFFFF) : ((crc << 1) & 0xFFFF);
+    }
+    return crc;
+  }
+  function tlvParse_(str){
+    var out = {}, i = 0;
+    while (i < str.length){
+      if (i + 4 > str.length) return null;
+      var tag = str.substr(i, 2), len = parseInt(str.substr(i + 2, 2), 10);
+      if (!/^\d{2}$/.test(tag) || isNaN(len) || i + 4 + len > str.length) return null;
+      out[tag] = str.substr(i + 4, len);
+      i += 4 + len;
+    }
+    return out;
+  }
+  // Slip QR = EMV-style TLV:  00{ 00 api id, 01 sending bank (3 digits), 02 transaction ref } 51 country 91 CRC16
+  // returns {bankCode, transRef} or null when this is not a (valid) slip QR
+  function parseSlipQr_(text){
+    text = String(text || "").trim();
+    var top = tlvParse_(text);
+    if (!top || !top["00"]) return null;
+    var sub = tlvParse_(top["00"]);
+    if (!sub) return null;
+    var bank = sub["01"], ref = sub["02"];
+    if (!/^\d{3}$/.test(bank || "") || !/^[A-Za-z0-9]{10,40}$/.test(ref || "")) return null;
+    if (top["91"]){                       // integrity check: a misread QR fails here
+      if (text.slice(-8, -4) !== "9104") return null;
+      var want = ("0000" + crc16ccitt_(text.slice(0, -4)).toString(16).toUpperCase()).slice(-4);
+      if (want !== String(top["91"]).toUpperCase()) return null;
+    }
+    return { bankCode: bank, transRef: ref };
+  }
+  function imgFromFile_(file){
+    return fileToDataUrl_(file).then(function(u){
+      return new Promise(function(resolve, reject){
+        var im = new Image(); im.onload = function(){ resolve(im); }; im.onerror = reject; im.src = u;
+      });
+    });
+  }
+  function fileToImage_(file){
+    if (window.createImageBitmap) return createImageBitmap(file).catch(function(){ return imgFromFile_(file); });
+    return imgFromFile_(file);
+  }
+  function decodeRegion_(jsQR, img, sx, sy, sw, sh){
+    var scale = Math.min(1.6, 1600 / Math.max(sw, sh));
+    var w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    var data = ctx.getImageData(0, 0, w, h);
+    var r = jsQR(data.data, w, h, { inversionAttempts: "attemptBoth" });
+    return (r && r.data) ? r.data : null;
+  }
+  // -> { found: any QR seen, slip: it was a valid bank-slip QR, bankCode, transRef }
+  function scanSlipQr_(file){
+    if (!file) return Promise.resolve({ found:false, slip:false });
+    return Promise.all([loadJsQR_(), fileToImage_(file)]).then(function(res){
+      var jsQR = res[0], img = res[1], W = img.width, H = img.height, anyQr = false;
+      var regions = [[0, 0, W, H], [0, H * 0.4, W, H * 0.6]];
+      // the QR can be small inside a big screenshot: also try overlapping tiles
+      [0, 0.25, 0.5].forEach(function(yy){ [0, 0.25, 0.5].forEach(function(xx){ regions.push([W * xx, H * yy, W * 0.5, H * 0.5]); }); });
+      var i = 0;
+      return new Promise(function(resolve){
+        (function step(){
+          if (i >= regions.length) return resolve({ found: anyQr, slip: false });
+          var r = regions[i++], text = null;
+          try { text = decodeRegion_(jsQR, img, Math.round(r[0]), Math.round(r[1]), Math.max(1, Math.round(r[2])), Math.max(1, Math.round(r[3]))); } catch (e){}
+          if (text){
+            anyQr = true;
+            var parsed = parseSlipQr_(text);
+            if (parsed) return resolve({ found:true, slip:true, bankCode: parsed.bankCode, transRef: parsed.transRef });
+          }
+          setTimeout(step, 0);                // let the page breathe between attempts
+        })();
+      });
+    });
+  }
+  function slipInfoFromScan_(scan, hasFile){
+    if (scan && scan.slip) return { bankCode: scan.bankCode, transRef: scan.transRef, qrFound: true };
+    return hasFile ? { qrFound: false } : null;
   }
 
   function fileToDataUrl_(file){
@@ -1767,6 +1928,8 @@
           _dbCache.config.customFields = cf;
           _dbEmitDoc("config/customFields");
         }
+        var ns = Array.isArray(d.slips) ? d.slips : [];
+        if (JSON.stringify(ns) !== JSON.stringify(slipsData)){ slipsData = ns; render(); }
         _dbEverLoaded = true;
       })
       .catch(function(err){
@@ -1888,6 +2051,7 @@
     return _dbUploadEmbedded(data).then(function(clean){
       return _dbCall("setDoc", { path:path, data:clean, store:"live" }).then(function(){
         _dbApplyWriteLocal(path, clean, "set");
+        return clean;
       });
     });
   }
@@ -1920,7 +2084,7 @@
     // read exactly like the customer view, so hide it whenever isAdmin
     if (!_isPreviewFrame) $("adminTrigger").hidden = isAdmin;
     [renderTopbar, renderHero, renderStaticText_, renderStats, renderLegend, renderAdminBar,
-     renderCanvas, renderBookingsPanel, renderZonesPanel, renderFieldsPanel].forEach(function(fn){
+     renderCanvas, renderBookingsPanel, renderSlipsPanel, renderZonesPanel, renderFieldsPanel].forEach(function(fn){
       try{ fn(); }catch(e){ console.error("mayucard6: " + (fn.name || "render") + " failed", e); }
     });
   }
@@ -2457,6 +2621,7 @@
     $("bkSlipPreview").innerHTML = "SLIP";
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
+    bkSlipScan_ = null; $("bkSlipScan").className = "slip-scan"; $("bkSlipScan").textContent = "";
     $("bkPower").checked = false;
     populateCategorySelect_($("bkCategory"));
     renderPaymentInfoBlock_();
@@ -2489,6 +2654,7 @@
     $("bkSlipPreview").innerHTML = "SLIP";
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
+    bkSlipScan_ = null; $("bkSlipScan").className = "slip-scan"; $("bkSlipScan").textContent = "";
     $("bkPower").checked = false;
     populateCategorySelect_($("bkCategory"));
     renderPaymentInfoBlock_();
@@ -2511,9 +2677,20 @@
   });
   $("bkSlipFile").addEventListener("change", function(){
     var f = this.files[0];
+    var note = $("bkSlipScan");
+    bkSlipScan_ = null; note.className = "slip-scan"; note.textContent = "";
     if (!f) return;
     prepareFile_(f).then(function(dataUrl){
       $("bkSlipPreview").innerHTML = imgTag_(dataUrl) || "SLIP";
+    });
+    var p = scanSlipQr_(f).catch(function(err){ console.warn("mayucard6: slip QR scan failed", err); return { found:false, slip:false }; });
+    var mine = { file: f, promise: p };
+    bkSlipScan_ = mine;
+    note.textContent = t("slipQrReading");
+    p.then(function(r){
+      if (bkSlipScan_ !== mine) return;     // another file was chosen meanwhile
+      if (r.slip){ note.className = "slip-scan ok"; note.textContent = t("slipQrOk"); }
+      else { note.className = "slip-scan warn"; note.textContent = r.found ? t("slipQrOther") : t("slipQrNone"); }
     });
   });
   $("bkForm").addEventListener("submit", function(e){
@@ -2539,8 +2716,11 @@
     btn.disabled = true; btn.textContent = t("saving");
     var logoFile = $("bkLogoFile").files[0] || null;
     var slipFile = $("bkSlipFile").files[0] || null;
-    Promise.all([prepareFile_(logoFile), prepareFile_(slipFile, SLIP_MAX_SIDE, SLIP_QUALITY)]).then(function(res){
-      var logoDataUrl = res[0], slipDataUrl = res[1];
+    var slipScanP = !slipFile ? Promise.resolve(null)
+      : ((bkSlipScan_ && bkSlipScan_.file === slipFile) ? bkSlipScan_.promise
+         : scanSlipQr_(slipFile).catch(function(){ return { found:false, slip:false }; }));
+    Promise.all([prepareFile_(logoFile), prepareFile_(slipFile, SLIP_MAX_SIDE, SLIP_QUALITY), slipScanP]).then(function(res){
+      var logoDataUrl = res[0], slipDataUrl = res[1], slipInfo = slipInfoFromScan_(res[2], !!slipDataUrl);
       var powerFee = hasPower ? POWER_FEE : 0;
       var now = new Date().toISOString();
       var shared = {
@@ -2550,6 +2730,7 @@
         status: "pending", createdAt: now, updatedAt: now,
         custom: collectCustomValues_("bk"),
         hasSlip: !!slipDataUrl, hasLogo: !!logoDataUrl,
+        slip: slipInfo,
         slipData: slipDataUrl ? { dataUrl: slipDataUrl, filename: slipFile ? slipFile.name : "" } : null,
         logoData: logoDataUrl ? { dataUrl: logoDataUrl, filename: logoFile ? logoFile.name : "" } : null
       };
@@ -2722,6 +2903,7 @@
     $("beNote").value = booking.note || "";
     renderCustomFieldInputs_("beCustomFields", "be", booking.custom || {});
     $("beSlipCurrent").innerHTML = fileRowHtml_(booking.slipData, t("noSlipYet"));
+    renderSlipReview_(tableId);
     $("beLogoCurrent").innerHTML = fileRowHtml_(booking.logoData, t("noLogoYet"));
     $("beSlipFile").value = "";
     $("beLogoFile").value = "";
@@ -2736,6 +2918,7 @@
     var btn = $("btnBeSave");
     btn.disabled = true; btn.textContent = t("saving");
     var newSlipFile = $("beSlipFile").files[0] || null;
+    var scanP = newSlipFile ? scanSlipQr_(newSlipFile).catch(function(){ return { found:false, slip:false }; }) : Promise.resolve(null);
     var newLogoFile = $("beLogoFile").files[0] || null;
     Promise.all([prepareFile_(newSlipFile, SLIP_MAX_SIDE, SLIP_QUALITY), prepareFile_(newLogoFile)]).then(function(res){
       var newSlipUrl = res[0], newLogoUrl = res[1];
@@ -2760,7 +2943,16 @@
         hasSlip: !!slipData, hasLogo: !!logoData,
         updatedAt: new Date().toISOString()
       });
-      return saveBooking(id, patch);
+      return saveBooking(id, patch).then(function(clean){
+        if (!newSlipFile) return;
+        // a new slip was attached: register it (reference + files) so it joins the transfer list
+        return scanP.then(function(scan){
+          return _rpc("admin_attach_slip", { p_table_id: id, p_slip: slipInfoFromScan_(scan, true), p_file: (clean && clean.slipData) || null });
+        }).then(function(){ return fetchAll(); }).catch(function(e){
+          console.error("mayucard6: slip attach failed", e);
+          toast(t("slipAttachFailed"));
+        });
+      });
     }).then(function(){
       btn.disabled = false; btn.textContent = t("save");
       closeSheet("scrimBookingEdit");
@@ -2845,6 +3037,9 @@
           // never leave the same shop booked on two tables: undo the copy
           return deleteBooking(newTableId).then(function(){ throw err; }, function(){ throw err; });
         });
+      }).then(function(){
+        // keep the slips pointing at the table the booking now lives on
+        return _rpc("admin_retarget_slips", { p_old: oldTableId, p_new: newTableId }).then(function(){ return fetchAll(); }).catch(function(e){ console.warn("mayucard6: retarget slips failed", e); });
       });
     }).then(function(){
       closeSheet("scrimBookingEdit");
@@ -2860,6 +3055,111 @@
   /* =========================================================
      ADMIN — all-bookings list (every booking, direct edit)
   ========================================================= */
+  /* =========================================================
+     ADMIN — slips: review each slip, and see them in transfer order
+  ========================================================= */
+  var BANK_CODES = { "002":"BBL", "004":"KBANK", "006":"KTB", "011":"TTB", "014":"SCB", "017":"Citi", "022":"CIMB Thai", "024":"UOB",
+                     "025":"BAY", "030":"GSB", "033":"GHB", "034":"BAAC", "066":"ISBT", "067":"TISCO", "069":"KKP", "070":"ICBC", "071":"TCRB", "073":"LH Bank" };
+  function bankLabel_(code){ return code ? (BANK_CODES[code] || code) : ""; }
+  function slipsForTable_(id){ return slipsData.filter(function(sl){ return (sl.tableIds || []).indexOf(id) > -1; }); }
+  function slipFlagHtml_(id){
+    var dup = slipsForTable_(id).some(function(sl){ return sl.duplicateOf && sl.status !== "rejected"; });
+    return dup ? '<span class="status-badge st-dup">'+esc(t("slipDuplicate"))+'</span>' : '';
+  }
+  function fmtDateTime_(iso){
+    if (!iso) return "-";
+    try { return new Date(iso).toLocaleString(currentLocale(), { dateStyle:"short", timeStyle:"short" }); }
+    catch (e){ return String(iso); }
+  }
+  function toLocalInput_(iso){
+    if (!iso) return "";
+    var d = new Date(iso); if (isNaN(d.getTime())) return "";
+    var p = function(n){ return ("0" + n).slice(-2); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+  function slipStatusLabel_(st){
+    return t({ pending:"slipStPending", verified:"slipStVerified", mismatch:"slipStMismatch", rejected:"slipStRejected" }[st] || "slipStPending");
+  }
+  function slipRefText_(sl){ return sl.transRef ? bankLabel_(sl.bankCode) + " …" + String(sl.transRef).slice(-6) : t("slipNoQr"); }
+
+  function renderSlipsPanel(){
+    var head = $("slipsSectionHead"), hint = $("slipsSectionHint"), panel = $("slipsPanel");
+    if (!isAdmin || frontDeskMode){ head.hidden = true; hint.hidden = true; panel.hidden = true; return; }
+    head.hidden = false; hint.hidden = false; panel.hidden = false;
+    panel.innerHTML = slipsData.map(function(sl, i){
+      var target = (sl.tableIds || []).filter(function(id){ return bookings[id]; })[0] || "";
+      var timeLine = sl.transferredAt ? t("slipTransferredFmt", { time: fmtDateTime_(sl.transferredAt) })
+                                      : (t("slipUploadedFmt", { time: fmtDateTime_(sl.uploadedAt) }) + " · " + t("slipWaitingTime"));
+      var amt = (sl.amount != null ? fmtPrice(sl.amount) + " / " : "") + t("slipExpectedFmt", { amount: fmtPrice(sl.expectedAmount) });
+      var gone = sl.bookingExists ? "" : " · " + t("slipReleased");
+      return '<div class="booking-row" data-table="'+esc(target)+'">'+
+        '<div class="slip-rank">'+(sl.transferredAt ? (i + 1) : "·")+'</div>'+
+        '<div class="br-info">'+
+          '<div class="br-shop">'+esc(sl.shop || t("unnamedShop"))+' <span class="mono">'+esc((sl.tableIds || []).join(", "))+'</span></div>'+
+          '<div class="br-meta">'+esc(timeLine + " · " + amt + " · " + slipRefText_(sl) + gone)+'</div>'+
+        '</div>'+
+        (sl.duplicateOf ? '<span class="status-badge st-dup">'+esc(t("slipDuplicate"))+'</span>' : '')+
+        '<span class="status-badge st-'+esc(sl.status)+'">'+esc(slipStatusLabel_(sl.status))+'</span>'+
+      '</div>';
+    }).join("") || '<div class="empty-state">'+esc(t("slipsEmpty"))+'</div>';
+    panel.querySelectorAll(".booking-row").forEach(function(row){
+      row.addEventListener("click", function(){ if (row.dataset.table) openBookingEditor(row.dataset.table); });
+    });
+  }
+
+  function renderSlipReview_(tableId){
+    var box = $("beSlipReview");
+    if (!box) return;
+    box.innerHTML = slipsForTable_(tableId).map(function(sl){
+      var opts = ["pending", "verified", "mismatch", "rejected"].map(function(v){
+        return '<option value="'+v+'"'+(sl.status === v ? " selected" : "")+'>'+esc(slipStatusLabel_(v))+'</option>';
+      }).join("");
+      var dupWarn = sl.duplicateOf
+        ? '<div class="slip-warn">'+esc(t("slipDuplicateWarnFmt", { tables: (sl.duplicateOfTables || []).join(", ") || "?" }))+'</div>' : '';
+      return '<div class="slip-card" data-slip="'+esc(sl.id)+'">'+
+        '<div class="slip-head"><span>'+esc(slipRefText_(sl))+'</span>'+
+          '<span class="status-badge st-'+esc(sl.status)+'">'+esc(slipStatusLabel_(sl.status))+'</span></div>'+
+        '<div class="slip-meta">'+esc(t("slipUploadedFmt", { time: fmtDateTime_(sl.uploadedAt) }) + " · " + t("slipExpectedFmt", { amount: fmtPrice(sl.expectedAmount) }))+'</div>'+
+        dupWarn+
+        '<div class="field-row">'+
+          '<div class="field"><label>'+esc(t("slipTransferTime"))+'</label><input type="datetime-local" data-f="time" value="'+esc(toLocalInput_(sl.transferredAt))+'" /></div>'+
+          '<div class="field"><label>'+esc(t("slipAmountSeen"))+'</label><input type="number" min="0" step="0.01" data-f="amount" value="'+(sl.amount != null ? esc(sl.amount) : "")+'" /></div>'+
+        '</div>'+
+        '<div class="field"><label>'+esc(t("slipVerdict"))+'</label><select data-f="status">'+opts+'</select></div>'+
+        '<div class="field"><label>'+esc(t("slipNote"))+'</label><input type="text" maxlength="200" data-f="note" value="'+esc(sl.note || "")+'" /></div>'+
+        '<label class="check-row"><input type="checkbox" data-f="paid" /><span class="cr-text">'+esc(t("slipMarkPaid"))+'</span></label>'+
+        '<button type="button" class="btn btn-sm btn-accent" data-slip-save>'+esc(t("slipSaveBtn"))+'</button>'+
+      '</div>';
+    }).join("");
+  }
+  $("beSlipReview").addEventListener("click", function(e){
+    var btn = e.target.closest ? e.target.closest("[data-slip-save]") : null;
+    if (!btn) return;
+    var card = btn.closest(".slip-card");
+    var f = function(k){ return card.querySelector('[data-f="'+k+'"]'); };
+    var tv = f("time").value, av = f("amount").value, status = f("status").value;
+    var paid = f("paid").checked, tableId = currentBookingEditId;
+    btn.disabled = true;
+    _rpc("admin_review_slip", {
+      p_id: card.dataset.slip, p_status: status,
+      p_amount: av === "" || isNaN(Number(av)) ? null : Number(av),
+      p_transferred_at: tv ? new Date(tv).toISOString() : null,
+      p_note: f("note").value.trim() || null,
+      p_mark_paid: !!(paid && status === "verified")
+    }).then(function(){ return fetchAll(); }).then(function(){
+      btn.disabled = false;
+      toast(t("slipSaved"));
+      if (tableId && currentBookingEditId === tableId){
+        if (bookings[tableId]) $("beStatus").value = bookings[tableId].status || "pending";   // don't let a later save undo "paid"
+        renderSlipReview_(tableId);
+      }
+    }).catch(function(err){
+      btn.disabled = false;
+      console.error("mayucard6: review slip failed", err);
+      toast(t("saveFailedRetry"));
+    });
+  });
+
   function renderBookingsPanel(){
     var head = $("bookingsSectionHead"), filters = $("bookingFilters"), panel = $("bookingsPanel");
     if (!isAdmin || frontDeskMode){ head.hidden = true; filters.hidden = true; panel.hidden = true; return; }
@@ -2890,6 +3190,7 @@
           '<div class="br-shop">'+esc(b.shop||t("unnamedShop"))+'</div>'+
           '<div class="br-meta">'+(z?esc(localizedText_(z.label)):"")+' · '+fmtPrice(b.price)+' · '+esc(b.phone||"")+'</div>'+
         '</div>'+
+        slipFlagHtml_(b.tableId)+
         '<span class="status-badge st-'+esc(b.status||"pending")+'">'+statusLabel_(b.status)+'</span>'+
         '<span class="br-table mono">'+esc(b.tableId)+'</span>'+
       '</div>';
@@ -3186,7 +3487,7 @@
   $("loginPw").addEventListener("keydown", function(e){ if (e.key === "Enter") doLogin(); });
   function logout(){
     if (sb) sb.auth.signOut().catch(function(){});
-    isAdmin = false; adminMode = "preview"; adminToken = null; frontDeskMode = false;
+    isAdmin = false; adminMode = "preview"; adminToken = null; frontDeskMode = false; slipsData = [];
     _dbWriteStore = "live";
     try{
       sessionStorage.removeItem(ADMIN_FLAG_KEY);

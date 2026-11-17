@@ -164,14 +164,15 @@ $$;
 
 create or replace function public.create_booking(p_table_id text, p_data jsonb) returns jsonb
 language plpgsql volatile security definer set search_path = public as $$
-declare v jsonb;
+declare v jsonb; s jsonb;
 begin
   v := public._clean_booking(p_table_id, p_data, null);
   insert into public.documents (store, collection, id, data)
   values ('live', 'bookings', p_table_id, v)
   on conflict (store, collection, id) do nothing;   -- the primary key makes double-booking impossible
   if not found then raise exception 'table already booked'; end if;
-  return jsonb_build_object('ok', true, 'booking', v);
+  s := public._record_slip(array[p_table_id], null, p_data->'slip', v->'slipData', public._num(v->>'price'));
+  return jsonb_build_object('ok', true, 'booking', v, 'slip', s);
 end $$;
 
 create or replace function public.create_booking_multi(p_items jsonb) returns jsonb
@@ -179,6 +180,7 @@ language plpgsql volatile security definer set search_path = public as $$
 declare
   g uuid := gen_random_uuid(); item jsonb; tid text; v jsonb;
   booked text[] := '{}'; skipped text[] := '{}'; out_b jsonb := '{}'::jsonb;
+  first_item jsonb; first_v jsonb; total numeric := 0; s jsonb;
 begin
   if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) = 0 then
     raise exception 'missing bookings';
@@ -194,11 +196,17 @@ begin
     insert into public.documents (store, collection, id, data)
     values ('live', 'bookings', tid, v)
     on conflict (store, collection, id) do nothing;
-    if found then booked := booked || tid; out_b := out_b || jsonb_build_object(tid, v);
+    if found then
+      booked := booked || tid; out_b := out_b || jsonb_build_object(tid, v);
+      total := total + coalesce(public._num(v->>'price'), 0);
+      if first_item is null then first_item := item->'data'; first_v := v; end if;
     else skipped := skipped || tid; end if;
   end loop;
+  if first_item is not null then   -- the slip is shared by the whole group: store it once
+    s := public._record_slip(booked, g, first_item->'slip', first_v->'slipData', total);
+  end if;
   return jsonb_build_object('ok', true, 'groupId', g, 'booked', to_jsonb(booked),
-                            'skipped', to_jsonb(skipped), 'bookings', out_b);
+                            'skipped', to_jsonb(skipped), 'bookings', out_b, 'slip', s);
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -216,6 +224,7 @@ begin
     'zones',    public._docs('draft', 'zones'),
     'tables',   public._docs('draft', 'tables'),
     'bookings', public._docs('live', 'bookings'),          -- always the real, current bookings
+    'slips',    public._slips_json(),
     'config', jsonb_build_object(
       'settings',     public._doc('draft', 'config', 'settings'),
       'customFields', public._doc('draft', 'config', 'customFields')
@@ -295,6 +304,139 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+
+-- =====================================================================
+-- SLIP TRACKING (no bank API)
+-- One row per payment slip that reaches the system. What can be trusted:
+--   uploaded_at  : set by the SERVER when the slip arrived (customers can't change it)
+--   bank_code + trans_ref : read from the slip's QR code by the page; the same bank
+--                  transaction can only be the "original" once, later uses are flagged
+-- What cannot be proven without a bank/verification API: that the slip is genuine.
+-- transferred_at / amount are entered by an admin after reading the slip image.
+-- =====================================================================
+create table if not exists public.slips (
+  id              uuid primary key default gen_random_uuid(),
+  table_ids       text[] not null,                      -- tables this slip pays for (several = one grouped booking)
+  group_id        uuid,
+  bank_code       text,                                 -- 3-digit sending bank code from the slip QR (014 = SCB, ...)
+  trans_ref       text,                                 -- bank transaction reference from the slip QR
+  qr_found        boolean not null default false,
+  file_url        text,                                 -- Supabase Storage copy (https)
+  drive_url       text,                                 -- Google Drive copy (https)
+  file_name       text,
+  expected_amount numeric,                              -- what the booking costs (computed by the database)
+  uploaded_at     timestamptz not null default now(),   -- when the slip reached the server
+  transferred_at  timestamptz,                          -- transfer time read from the slip by an admin
+  amount          numeric,                              -- amount an admin confirmed on the slip
+  status          text not null default 'pending' check (status in ('pending','verified','mismatch','rejected')),
+  duplicate_of    uuid references public.slips(id),     -- set when the same bank transaction was already used
+  note            text,
+  reviewed_by     uuid,
+  reviewed_at     timestamptz
+);
+-- one "original" per bank transaction; later uses are stored but marked duplicate_of
+create unique index if not exists slips_ref_original on public.slips (bank_code, trans_ref)
+  where trans_ref is not null and duplicate_of is null;
+create index if not exists slips_uploaded_at on public.slips (uploaded_at);
+alter table public.slips enable row level security;
+revoke all on public.slips from anon, authenticated;
+
+create or replace function public._record_slip(p_table_ids text[], p_group uuid, p_slip jsonb, p_file jsonb, p_expected numeric)
+returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare
+  v_bank text := nullif(btrim(p_slip->>'bankCode'), '');
+  v_ref  text := nullif(btrim(p_slip->>'transRef'), '');
+  v_file jsonb := public._clean_file(p_file);
+  v_id uuid; v_dup uuid;
+begin
+  if v_bank is null or v_bank !~ '^[0-9]{3}$' or v_ref is null or v_ref !~ '^[A-Za-z0-9]{10,40}$' then
+    v_bank := null; v_ref := null;                      -- not a plausible slip QR: keep the file, drop the reference
+  end if;
+  if v_file is null and v_ref is null then return null; end if;   -- no slip was submitted
+  for i in 1..2 loop
+    v_dup := null;
+    if v_ref is not null then
+      select id into v_dup from public.slips where bank_code = v_bank and trans_ref = v_ref and duplicate_of is null limit 1;
+    end if;
+    begin
+      insert into public.slips (table_ids, group_id, bank_code, trans_ref, qr_found, file_url, drive_url, file_name, expected_amount, duplicate_of)
+      values (p_table_ids, p_group, v_bank, v_ref, v_ref is not null, v_file->>'dataUrl', v_file->>'driveUrl', v_file->>'filename', p_expected, v_dup)
+      returning id into v_id;
+      exit;
+    exception when unique_violation then
+      v_id := null;      -- the same reference was inserted at this very moment: retry, it will be stored as a duplicate
+    end;
+  end loop;
+  if v_id is null then raise exception 'could not record slip'; end if;
+  return jsonb_build_object('id', v_id, 'duplicate', v_dup is not null);
+end $$;
+
+-- all slips for the admin screen, in transfer order: confirmed transfer time first,
+-- then slips whose transfer time is not entered yet (by arrival time)
+create or replace function public._slips_json() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', s.id, 'tableIds', to_jsonb(s.table_ids), 'groupId', s.group_id,
+    'bankCode', s.bank_code, 'transRef', s.trans_ref, 'qrFound', s.qr_found,
+    'fileUrl', s.file_url, 'driveUrl', s.drive_url, 'fileName', s.file_name,
+    'expectedAmount', s.expected_amount, 'uploadedAt', s.uploaded_at, 'transferredAt', s.transferred_at,
+    'amount', s.amount, 'status', s.status, 'duplicateOf', s.duplicate_of, 'note', s.note, 'reviewedAt', s.reviewed_at,
+    'duplicateOfTables', (select to_jsonb(o.table_ids) from public.slips o where o.id = s.duplicate_of),
+    'shop', (select b.data->>'shop' from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = s.table_ids[1]),
+    'bookingStatus', (select b.data->>'status' from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = s.table_ids[1]),
+    'bookingExists', exists (select 1 from public.documents b where b.store = 'live' and b.collection = 'bookings' and b.id = s.table_ids[1])
+  ) order by (s.transferred_at is null), s.transferred_at, s.uploaded_at), '[]'::jsonb)
+  from public.slips s;
+$$;
+
+-- the admin read the slip: record the confirmed amount/time and the verdict
+create or replace function public.admin_review_slip(p_id uuid, p_status text, p_amount numeric default null,
+                                                    p_transferred_at timestamptz default null, p_note text default null,
+                                                    p_mark_paid boolean default false)
+returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare v public.slips;
+begin
+  perform public._require_admin();
+  if p_status not in ('pending','verified','mismatch','rejected') then raise exception 'bad status: %', p_status; end if;
+  if p_amount is not null and p_amount < 0 then raise exception 'bad amount'; end if;
+  if p_transferred_at is not null and p_transferred_at > now() + interval '1 day' then raise exception 'transfer time is in the future'; end if;
+  update public.slips
+     set status = p_status, amount = p_amount, transferred_at = p_transferred_at, note = left(p_note, 500),
+         reviewed_by = auth.uid(), reviewed_at = now()
+   where id = p_id returning * into v;
+  if not found then raise exception 'slip not found'; end if;
+  if p_mark_paid and p_status = 'verified' then
+    update public.documents
+       set data = data || jsonb_build_object('status', 'paid', 'updatedAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+           updated_at = now()
+     where store = 'live' and collection = 'bookings' and id = any (v.table_ids) and coalesce(data->>'status', 'pending') = 'pending';
+  end if;
+  return jsonb_build_object('ok', true, 'id', v.id, 'status', v.status);
+end $$;
+
+-- the admin adds / replaces a slip for an existing booking
+create or replace function public.admin_attach_slip(p_table_id text, p_slip jsonb, p_file jsonb) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+declare b jsonb; r jsonb;
+begin
+  perform public._require_admin();
+  b := public._doc('live', 'bookings', p_table_id);
+  if b is null then raise exception 'booking not found: %', p_table_id; end if;
+  r := public._record_slip(array[p_table_id], nullif(b->>'groupId', '')::uuid, p_slip, p_file, public._num(b->>'price'));
+  return jsonb_build_object('ok', true, 'slip', r);
+end $$;
+
+-- keep slips pointing at the right table when an admin moves a booking
+create or replace function public.admin_retarget_slips(p_old text, p_new text) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  update public.slips set table_ids = array_replace(table_ids, p_old, p_new) where p_old = any (table_ids);
+  return jsonb_build_object('ok', true);
+end $$;
+
 -- ---------------------------------------------------------------------
 -- who may call what
 -- ---------------------------------------------------------------------
@@ -308,6 +450,9 @@ grant execute on function public.admin_set_doc(text, text, jsonb, boolean) to au
 grant execute on function public.admin_delete_doc(text, text)           to authenticated;
 grant execute on function public.publish_draft()                        to authenticated;
 grant execute on function public.reset_draft_from_live()                to authenticated;
+grant execute on function public.admin_review_slip(uuid, text, numeric, timestamptz, text, boolean) to authenticated;
+grant execute on function public.admin_attach_slip(text, jsonb, jsonb)  to authenticated;
+grant execute on function public.admin_retarget_slips(text, text)       to authenticated;
 
 -- ---------------------------------------------------------------------
 -- file uploads (slip / logo / payment QR) — Supabase Storage
