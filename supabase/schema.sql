@@ -57,6 +57,15 @@ language sql stable security definer set search_path = public as $$
   from public.documents where store = p_store and collection = p_collection;
 $$;
 
+-- same as _docs, but optionally leaves out documents flagged "v2only" (the new floor-plan layout is
+-- rolled out in two steps so the old page keeps working until the new page is deployed)
+create or replace function public._docs_vis(p_store text, p_collection text, p_all boolean) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_object_agg(id, data), '{}'::jsonb)
+  from public.documents where store = p_store and collection = p_collection
+    and (p_all or coalesce(data->>'v2only', '') <> 'true');
+$$;
+
 create or replace function public._doc(p_store text, p_collection text, p_id text) returns jsonb
 language sql stable security definer set search_path = public as $$
   select data from public.documents
@@ -152,8 +161,10 @@ end $$;
 create or replace function public.get_public_state() returns jsonb
 language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
-    'zones',  public._docs('live', 'zones'),
-    'tables', public._docs('live', 'tables'),
+    'zones',  public._docs_vis('live', 'zones', false),
+    'tables', public._docs_vis('live', 'tables', false),
+    'zonesAll',  public._docs_vis('live', 'zones', true),
+    'tablesAll', public._docs_vis('live', 'tables', true),
     'bookings', coalesce((
       select jsonb_object_agg(id, jsonb_strip_nulls(jsonb_build_object(
         'tableId',  id,
@@ -174,6 +185,9 @@ create or replace function public.create_booking(p_table_id text, p_data jsonb) 
 language plpgsql volatile security definer set search_path = public as $$
 declare v jsonb; s jsonb;
 begin
+  if not public.is_admin() and public._doc('live', 'tables', p_table_id)->>'locked' = 'true' then
+    raise exception 'table locked';
+  end if;
   v := public._stamp_dups(public._clean_booking(p_table_id, p_data, null), p_data, null);
   insert into public.documents (store, collection, id, data)
   values ('live', 'bookings', p_table_id, v)
@@ -196,7 +210,8 @@ begin
   if jsonb_array_length(p_items) > 20 then raise exception 'too many tables in one booking'; end if;
   for item in select value from jsonb_array_elements(p_items) loop
     tid := item->>'tableId';
-    if tid is null or public._doc('live', 'tables', tid) is null then
+    if tid is null or public._doc('live', 'tables', tid) is null
+       or (not public.is_admin() and public._doc('live', 'tables', tid)->>'locked' = 'true') then
       skipped := skipped || coalesce(tid, '?');
       continue;
     end if;
@@ -567,7 +582,8 @@ declare
 begin
   b := public._doc('live', 'bookings', p_old);
   if b is null then raise exception 'booking not found'; end if;
-  if public._doc('live', 'tables', p_new) is null or public._doc('live', 'bookings', p_new) is not null then
+  if public._doc('live', 'tables', p_new) is null or public._doc('live', 'bookings', p_new) is not null
+     or public._doc('live', 'tables', p_new)->>'locked' = 'true' then
     raise exception 'new table not available';
   end if;
   select count(*) into pend from public.change_requests where old_table = p_old and status = 'pending';

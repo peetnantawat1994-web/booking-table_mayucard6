@@ -30,3 +30,14 @@
 แล้วกลับไปที่ Netlify → Deploys → **Start auto publishing**
 
 ดู tag backup ทั้งหมด: GitHub → repo → **Tags** หรือ `git tag -l 'backup/*'`
+
+## Floor plan v2 (MAYUCARD 6 map) — two-step rollout
+1. **Before merging** (safe, the old page keeps working): run `supabase/schema.sql`, then `supabase/layout-v2.sql`
+   in the SQL editor. Existing tables keep their old position and get a `v2` position; the new tables (P15–P20,
+   SP01–SP05, T01–T03) and zones are flagged `v2only` so the old page never receives them. SP and T tables are created
+   **locked** (customers cannot book them — enforced in the database; admins can still edit everything).
+2. Merge the PR (the new page uses the new floor-plan image and the `v2` positions).
+3. **After the new page is live**: run `supabase/layout-v2-finalize.sql` to make the new positions permanent
+   (drops the `v2` flags, deletes B03–B05 which are not on the new plan). Until then, dragging a table in layout
+   edit mode may snap back because the `v2` position still wins.
+Rollback: Netlify "Publish deploy" of the previous deploy; restore the data from the JSON backup if needed.
