@@ -488,6 +488,14 @@
   .tbl.is-locked, .table-btn.is-locked{opacity:.6; border-style:dashed; cursor:not-allowed; background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 3px,transparent 3px 7px);}
   .tbl.is-locked:hover, .table-btn.is-locked:hover{opacity:.7;}
   .sw-locked{background:repeating-linear-gradient(135deg,#bbb 0 3px,#eee 3px 6px); border-color:#999; border-style:dashed;}
+  .dash-topbar{margin:12px 0 12px;}
+  .dash-top-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    padding:14px 18px; font-size:16px; font-weight:800; font-family:inherit; letter-spacing:.01em;
+    color:var(--accent-ink); background:var(--accent); border:none; border-radius:var(--r-md);
+    box-shadow:0 6px 18px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  .dash-top-btn:hover{filter:brightness(1.08);} .dash-top-btn:active{transform:translateY(1px);}
   .dash-overlay{position:fixed; inset:0; z-index:90; background:var(--bg); overflow-y:auto; -webkit-overflow-scrolling:touch;}
   .dash-overlay[hidden]{display:none;}
   .dash-wrap{max-width:1180px; margin:0 auto; padding:14px 16px 60px;}
@@ -613,6 +621,10 @@
     </div>
   </div>
 
+  <div class="dash-topbar" id="dashTopBar" hidden>
+    <button type="button" class="dash-top-btn" id="btnDash">📊 แดชบอร์ดสรุป</button>
+  </div>
+
   <div class="hero">
     <div class="eyebrow" id="heroEyebrow">จองพื้นที่บูท</div>
     <h1 id="heroTitle">เลือกโต๊ะของคุณ</h1>
@@ -663,7 +675,6 @@
 
   <div class="section-head" id="slipsSectionHead" hidden>
     <h2 id="slipsSectionTitle" data-i18n="slipsSectionTitle">ลำดับการโอน (สลิป)</h2>
-    <button type="button" class="btn btn-sm btn-primary" id="btnDash">📊 แดชบอร์ดสรุป</button>
   </div>
   <div class="section-hint" id="slipsSectionHint" hidden data-i18n="slipsHint"></div>
   <div id="slipsPanel" hidden></div>
@@ -838,6 +849,7 @@
     <div class="dash-top">
       <h2 id="dashTitle">แดชบอร์ดสรุป</h2>
       <div class="dash-actions">
+        <button type="button" class="btn btn-sm" id="btnDashEdit">✏️</button>
         <button type="button" class="btn btn-sm" id="btnDashCsvAll">CSV</button>
         <button type="button" class="btn btn-sm" id="btnDashCsv">CSV</button>
         <button type="button" class="btn btn-sm btn-primary" id="btnDashClose">✕</button>
@@ -2511,6 +2523,7 @@
   function renderAdminBar(){
     var bar = $("adminBar");
     var zHead = $("zonesSectionHead");
+    $("dashTopBar").hidden = !(isAdmin && !frontDeskMode);
     if (!isAdmin || frontDeskMode){ bar.hidden = true; zHead.hidden = true; if (lockMode){ lockMode = false; selectedTableIds = []; } updateLockBar_(); return; }
     bar.hidden = false;
     zHead.hidden = false;
@@ -3655,7 +3668,7 @@
       tAll:"ทั้งหมด", tNoLogo:"ขาดโลโก้", tIssue:"ยังไม่ครบ (!)",
       zone:"โซน", total:"ทั้งหมด", booked:"จอง", locked:"ล็อก", free:"ว่าง", amount:"ยอดจอง", count:"จำนวน",
       shop:"ร้าน", tablesCol:"โต๊ะ", price:"ราคา", paid:"โอนแล้ว", balance:"คงเหลือ", status:"สถานะ", slipsCol:"สลิป", logo:"โลโก้", issues:"ประเด็น", pay:"การชำระ",
-      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV รายร้าน", csvAll:"CSV ทุกการจอง", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
+      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV รายร้าน", editBtn:"✏️ แก้ไขข้อความ", editCancel:"ยกเลิก", editSave:"บันทึก", editReset:"คืนค่าเดิม", editResetConfirm:"คืนข้อความและการแสดงผลทั้งหมดของแดชบอร์ดเป็นค่าเดิม?", editHelp:"แก้ข้อความของภาษา {lang} (ภาษาที่เลือกอยู่) · เว้นว่างหรือพิมพ์เหมือนเดิม = ใช้ข้อความเดิม · ติ๊กออกเพื่อซ่อนส่วนนั้น", editSections:"ส่วนที่แสดง", editTexts:"ข้อความทุกจุด", editOriginal:"ข้อความเดิม", editYours:"ข้อความของคุณ", secKpis:"ตัวเลขสรุปรวม",  csvAll:"CSV ทุกการจอง", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
     en:{ btn:"📊 Summary dashboard", title:"Back-office summary dashboard", sub:"Live data (auto-refreshing) · transferred amounts come from the slips attached in the system; fake slips cannot be detected",
       kTables:"Total tables", kBooked:"Booked", kFree:"Free (open)", kLocked:"Locked", kOcc:"Occupancy", kShops:"Shops",
       kExpected:"Total due", kReceived:"Total per slips", kVerified:"Verified slip amount", kOutstanding:"Outstanding", kPower:"Tables needing power",
@@ -3667,7 +3680,7 @@
       tAll:"All", tNoLogo:"No logo", tIssue:"Incomplete (!)",
       zone:"Zone", total:"Total", booked:"Booked", locked:"Locked", free:"Free", amount:"Booked value", count:"Count",
       shop:"Shop", tablesCol:"Tables", price:"Price", paid:"Paid", balance:"Balance", status:"Status", slipsCol:"Slips", logo:"Logo", issues:"Issues", pay:"Payment",
-      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV by shop", csvAll:"CSV all bookings", shopsFmt:"{n} shops", noCat:"(none)" },
+      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV by shop", editBtn:"✏️ Edit texts", editCancel:"Cancel", editSave:"Save", editReset:"Reset", editResetConfirm:"Reset all dashboard texts and sections to the defaults?", editHelp:"Editing the {lang} texts (current language) · leave empty or unchanged = default text · untick to hide a section", editSections:"Sections shown", editTexts:"All texts", editOriginal:"Original", editYours:"Your text", secKpis:"Summary numbers",  csvAll:"CSV all bookings", shopsFmt:"{n} shops", noCat:"(none)" },
     zh:{ btn:"📊 汇总仪表盘", title:"后台汇总仪表盘", sub:"实时数据（自动刷新）· 转账金额来自系统中附带的凭证，无法识别伪造凭证",
       kTables:"桌位总数", kBooked:"已订", kFree:"空位（开放）", kLocked:"已锁定", kOcc:"预订率", kShops:"商家数",
       kExpected:"应付总额", kReceived:"凭证合计", kVerified:"已核对凭证金额", kOutstanding:"未付金额", kPower:"需要用电的桌位",
@@ -3679,14 +3692,17 @@
       tAll:"全部", tNoLogo:"缺标志", tIssue:"未齐全 (!)",
       zone:"区域", total:"总数", booked:"已订", locked:"锁定", free:"空位", amount:"预订金额", count:"数量",
       shop:"商家", tablesCol:"桌位", price:"价格", paid:"已转", balance:"余额", status:"状态", slipsCol:"凭证", logo:"标志", issues:"问题", pay:"付款",
-      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV 按商家", csvAll:"CSV 全部预订", shopsFmt:"{n} 家", noCat:"（未填）" }
+      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV 按商家", editBtn:"✏️ 编辑文字", editCancel:"取消", editSave:"保存", editReset:"恢复默认", editResetConfirm:"将仪表盘所有文字和显示恢复为默认？", editHelp:"正在编辑 {lang} 文字（当前语言）· 留空或不改 = 默认文字 · 取消勾选可隐藏该部分", editSections:"显示的部分", editTexts:"所有文字", editOriginal:"原文", editYours:"你的文字", secKpis:"汇总数字",  csvAll:"CSV 全部预订", shopsFmt:"{n} 家", noCat:"（未填）" }
   };
   function dt_(k, vars){
     var d = DASH_I18N[lang] || DASH_I18N.th, v = d[k] != null ? d[k] : (DASH_I18N.th[k] != null ? DASH_I18N.th[k] : k);
+    var o = config && config.dashText && config.dashText[lang];   // texts the admin has edited
+    if (o && typeof o[k] === "string" && o[k].trim()) v = o[k];
     if (vars) Object.keys(vars).forEach(function(x){ v = v.replace("{"+x+"}", vars[x]); });
     return v;
   }
-  var dashOpen_ = false, dashTab_ = "all", dashQuery_ = "";
+  var dashOpen_ = false, dashTab_ = "all", dashQuery_ = "", dashEditing_ = false;
+  var DASH_SECS = [["kpis","secKpis"],["status","hStatus"],["slips","hSlips"],["pay","hPay"],["zones","hZones"],["cats","hCats"],["shops","hShops"]];
   function shopKey_(name){ return String(name || "").toLowerCase().replace(/[\s.\-_'"()]+/g, ""); }
   // everything the dashboard shows, computed from the live data already in memory
   function dashModel_(){
@@ -3801,14 +3817,16 @@
     if (btn) btn.textContent = dt_("btn");
     if (!dashOpen_) return;
     if (!isAdmin || frontDeskMode){ closeDash_(); return; }
-    var m = dashModel_();
     $("dashTitle").textContent = dt_("title"); $("btnDashCsv").textContent = dt_("csv"); $("btnDashCsvAll").textContent = dt_("csvAll");
+    $("btnDashEdit").textContent = dashEditing_ ? dt_("editCancel") : dt_("editBtn");
+    if (dashEditing_){ renderDashEditor_(); return; }
+    var m = dashModel_();
     var keepScroll = document.querySelector("#dashOverlay") ? $("dashOverlay").scrollTop : 0;
     var focusSearch = document.activeElement && document.activeElement.id === "dashSearch";
     var rows = dashFilteredRows_(m);
     var tabDefs = [["all","tAll",m.rows.length],["paid","pPaid",m.pay.paid],["partial","pPartial",m.pay.partial],["none","pNone",m.pay.none],["bad","pBad",m.pay.bad],["unchecked","pUnchecked",m.pay.unchecked],["nologo","tNoLogo",m.rows.filter(function(r){ return !r.logo; }).length],["issue","tIssue",m.rows.filter(function(r){ return r.issues.length; }).length]];
     var h = '<div class="dash-sub">'+esc(dt_("sub"))+'</div>'+
-      '<div class="dash-kpis">'+
+      '<div class="dash-kpis" data-sec="kpis">'+
         dashKpi_(m.tables, dt_("kTables"))+dashKpi_(m.booked, dt_("kBooked"))+dashKpi_(m.free, dt_("kFree"), "is-ok")+dashKpi_(m.locked, dt_("kLocked"))+
         dashKpi_(m.occ+"%", dt_("kOcc"))+dashKpi_(m.rows.length, dt_("kShops"))+
         dashKpi_(fmtPrice(m.expected), dt_("kExpected"))+dashKpi_(fmtPrice(m.received), dt_("kReceived"))+dashKpi_(fmtPrice(m.verified), dt_("kVerified"))+
@@ -3817,35 +3835,84 @@
         dashKpi_(m.noLogo, dt_("kNoLogo"), m.noLogo ? "is-warn" : "")+dashKpi_(m.changes, dt_("kChanges"), m.changes ? "is-warn" : "")+
       '</div>'+
       '<div class="dash-cols">'+
-        '<div><div class="dash-h">'+esc(dt_("hStatus"))+'</div><div class="dash-kpis">'+
+        '<div data-sec="status"><div class="dash-h">'+esc(dt_("hStatus"))+'</div><div class="dash-kpis">'+
           dashKpi_(m.st.pending||0, dt_("stPending"))+dashKpi_(m.st.confirmed||0, dt_("stConfirmed"))+dashKpi_(m.st.paid||0, dt_("stPaid"), "is-ok")+dashKpi_(m.st.cancelled||0, dt_("stCancelled"))+'</div></div>'+
-        '<div><div class="dash-h">'+esc(dt_("hSlips"))+'</div><div class="dash-kpis">'+
+        '<div data-sec="slips"><div class="dash-h">'+esc(dt_("hSlips"))+'</div><div class="dash-kpis">'+
           dashKpi_(m.slTotal, dt_("slTotal"))+dashKpi_(m.slSt.pending||0, dt_("slPending"), m.slSt.pending ? "is-warn" : "")+dashKpi_(m.slSt.verified||0, dt_("slVerified"), "is-ok")+
           dashKpi_((m.slSt.mismatch||0)+(m.slSt.rejected||0), dt_("slMismatch")+" / "+dt_("slRejected"), (m.slSt.mismatch||0)+(m.slSt.rejected||0) ? "is-warn" : "")+dashKpi_(m.slDup, dt_("slDup"), m.slDup ? "is-warn" : "")+'</div></div>'+
-        '<div><div class="dash-h">'+esc(dt_("hPay"))+'</div><div class="dash-kpis">'+
+        '<div data-sec="pay"><div class="dash-h">'+esc(dt_("hPay"))+'</div><div class="dash-kpis">'+
           dashKpi_(m.pay.paid, dt_("pPaid"), "is-ok")+dashKpi_(m.pay.partial, dt_("pPartial"), m.pay.partial ? "is-warn" : "")+dashKpi_(m.pay.none, dt_("pNone"), m.pay.none ? "is-warn" : "")+dashKpi_(m.pay.bad, dt_("pBad"), m.pay.bad ? "is-warn" : "")+'</div></div>'+
       '</div>'+
-      '<div class="dash-cols"><div><div class="dash-h">'+esc(dt_("hZones"))+'</div><div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("zone"))+'</th><th class="n">'+esc(dt_("total"))+'</th><th class="n">'+esc(dt_("booked"))+'</th><th class="n">'+esc(dt_("locked"))+'</th><th class="n">'+esc(dt_("free"))+'</th><th class="n">'+esc(dt_("amount"))+'</th><th></th></tr>'+
+      '<div class="dash-cols"><div data-sec="zones"><div class="dash-h">'+esc(dt_("hZones"))+'</div><div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("zone"))+'</th><th class="n">'+esc(dt_("total"))+'</th><th class="n">'+esc(dt_("booked"))+'</th><th class="n">'+esc(dt_("locked"))+'</th><th class="n">'+esc(dt_("free"))+'</th><th class="n">'+esc(dt_("amount"))+'</th><th></th></tr>'+
         m.zones.map(function(z){
           var zz = zones[z.key] || {}, free = z.total - z.booked - z.locked, pct = z.total ? Math.round(z.booked / z.total * 100) : 0;
           return '<tr><td><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+safeColor_(zz.color)+';margin-right:6px;"></span>'+esc(localizedText_(zz.label) || z.key)+'</td><td class="n">'+z.total+'</td><td class="n">'+z.booked+'</td><td class="n">'+z.locked+'</td><td class="n">'+free+'</td><td class="n">'+fmtPrice(z.value)+'</td><td><div class="dash-bar"><i style="width:'+pct+'%"></i></div></td></tr>';
         }).join("")+'</table></div></div>'+
-        '<div><div class="dash-h">'+esc(dt_("hCats"))+'</div><div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("hCats"))+'</th><th class="n">'+esc(dt_("count"))+'</th><th></th></tr>'+
+        '<div data-sec="cats"><div class="dash-h">'+esc(dt_("hCats"))+'</div><div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("hCats"))+'</th><th class="n">'+esc(dt_("count"))+'</th><th></th></tr>'+
         m.cats.map(function(c){ return '<tr><td>'+esc(c.c)+'</td><td class="n">'+c.n+'</td><td><div class="dash-bar"><i style="width:'+Math.round(c.n / Math.max(1, m.booked) * 100)+'%"></i></div></td></tr>'; }).join("")+'</table></div></div></div>'+
-      '<div class="dash-h">'+esc(dt_("hShops"))+' · '+esc(dt_("shopsFmt", { n: rows.length }))+'</div>'+
+      '<div data-sec="shops"><div class="dash-h">'+esc(dt_("hShops"))+' · '+esc(dt_("shopsFmt", { n: rows.length }))+'</div>'+
       '<input type="search" class="dash-search" id="dashSearch" autocomplete="off" placeholder="'+esc(dt_("search"))+'" value="'+esc(dashQuery_)+'" />'+
       '<div class="dash-tabs">'+tabDefs.map(function(d){ return '<button type="button" class="dash-tab'+(dashTab_ === d[0] ? " is-active" : "")+'" data-tab="'+d[0]+'">'+esc(dt_(d[1]))+' ('+d[2]+')</button>'; }).join("")+'</div>'+
-      '<div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("shop"))+'</th><th>'+esc(dt_("tablesCol"))+'</th><th class="n">'+esc(dt_("price"))+'</th><th class="n">'+esc(dt_("paid"))+'</th><th class="n">'+esc(dt_("balance"))+'</th><th>'+esc(dt_("pay"))+'</th><th>'+esc(dt_("status"))+'</th><th class="n">'+esc(dt_("slipsCol"))+'</th><th>'+esc(dt_("logo"))+'</th><th>'+esc(dt_("issues"))+'</th></tr>'+dashShopRowsHtml_(rows)+'</table></div>';
+      '<div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("shop"))+'</th><th>'+esc(dt_("tablesCol"))+'</th><th class="n">'+esc(dt_("price"))+'</th><th class="n">'+esc(dt_("paid"))+'</th><th class="n">'+esc(dt_("balance"))+'</th><th>'+esc(dt_("pay"))+'</th><th>'+esc(dt_("status"))+'</th><th class="n">'+esc(dt_("slipsCol"))+'</th><th>'+esc(dt_("logo"))+'</th><th>'+esc(dt_("issues"))+'</th></tr>'+dashShopRowsHtml_(rows)+'</table></div></div>';
+    var hid = (config && config.dashHidden) || [];
+    if (hid.length){
+      var tmp = document.createElement("div"); tmp.innerHTML = h;
+      hid.forEach(function(id){ tmp.querySelectorAll('[data-sec="'+id+'"]').forEach(function(n){ n.remove(); }); });
+      h = tmp.innerHTML;
+    }
     $("dashBody").innerHTML = h;
     $("dashOverlay").scrollTop = keepScroll;
     var se = $("dashSearch");
-    se.addEventListener("input", function(){ dashQuery_ = se.value; renderDashboard(); });
-    if (focusSearch){ se.focus(); try{ se.setSelectionRange(se.value.length, se.value.length); }catch(e){} }
+    if (se){
+      se.addEventListener("input", function(){ dashQuery_ = se.value; renderDashboard(); });
+      if (focusSearch){ se.focus(); try{ se.setSelectionRange(se.value.length, se.value.length); }catch(e){} }
+    }
     $("dashBody").querySelectorAll(".dash-tab").forEach(function(b){ b.addEventListener("click", function(){ dashTab_ = b.dataset.tab; renderDashboard(); }); });
     $("dashBody").querySelectorAll("tr[data-table]").forEach(function(tr){ tr.addEventListener("click", function(){ closeDash_(); openBookingEditor(tr.dataset.table); }); });
   }
+  // editor: rename every label of the dashboard (for the current language) and show / hide whole sections
+  function renderDashEditor_(){
+    var hid = (config && config.dashHidden) || [];
+    var keys = Object.keys(DASH_I18N.th).filter(function(k){ return k.indexOf("edit") !== 0; });
+    var langName = { th:"ไทย", en:"English", zh:"中文" }[lang] || lang;
+    var h = '<div class="dash-sub">'+esc(dt_("editHelp", { lang: langName }))+'</div>'+
+      '<div class="dash-h">'+esc(dt_("editSections"))+'</div><div class="dash-tabs">'+
+      DASH_SECS.map(function(d){ return '<label class="dash-tab" style="display:inline-flex;gap:6px;align-items:center;"><input type="checkbox" data-hide="'+d[0]+'"'+(hid.indexOf(d[0]) < 0 ? " checked" : "")+' /> '+esc(dt_(d[1]))+'</label>'; }).join("")+'</div>'+
+      '<div class="dash-h">'+esc(dt_("editTexts"))+'</div><div class="dash-table-wrap"><table class="dash-table"><tr><th style="width:36%">'+esc(dt_("editOriginal"))+'</th><th>'+esc(dt_("editYours"))+'</th></tr>'+
+      keys.map(function(k){
+        var def = (DASH_I18N[lang] && DASH_I18N[lang][k] != null) ? DASH_I18N[lang][k] : DASH_I18N.th[k];
+        return '<tr><td style="color:var(--ink-faint)">'+esc(def)+'</td><td><input type="text" class="dash-search" style="margin:0" data-key="'+esc(k)+'" data-def="'+esc(def)+'" value="'+esc(dt_(k))+'" /></td></tr>';
+      }).join("")+'</table></div>'+
+      '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">'+
+        '<button type="button" class="btn btn-primary" id="btnDashEditSave">'+esc(dt_("editSave"))+'</button>'+
+        '<button type="button" class="btn" id="btnDashEditCancel">'+esc(dt_("editCancel"))+'</button>'+
+        '<button type="button" class="btn" id="btnDashEditReset">'+esc(dt_("editReset"))+'</button>'+
+      '</div><div class="slip-scan" id="dashEditMsg"></div>';
+    $("dashBody").innerHTML = h;
+    $("btnDashEditCancel").addEventListener("click", function(){ dashEditing_ = false; renderDashboard(); });
+    $("btnDashEditReset").addEventListener("click", function(){
+      if (!confirm(dt_("editResetConfirm"))) return;
+      var all = Object.assign({}, (config && config.dashText) || {}); delete all[lang];
+      saveConfig({ dashText: all, dashHidden: [] }).then(function(){ dashEditing_ = false; renderDashboard(); }).catch(function(){ $("dashEditMsg").textContent = t("saveFailedRetry"); });
+    });
+    $("btnDashEditSave").addEventListener("click", function(){
+      var ovr = {};
+      $("dashBody").querySelectorAll("input[data-key]").forEach(function(i){
+        var v = i.value.trim();
+        if (v && v !== i.dataset.def) ovr[i.dataset.key] = v;
+      });
+      var hide = [];
+      $("dashBody").querySelectorAll("input[data-hide]").forEach(function(i){ if (!i.checked) hide.push(i.dataset.hide); });
+      var all = Object.assign({}, (config && config.dashText) || {});
+      if (Object.keys(ovr).length) all[lang] = ovr; else delete all[lang];
+      $("btnDashEditSave").disabled = true;
+      saveConfig({ dashText: all, dashHidden: hide }).then(function(){ dashEditing_ = false; renderDashboard(); toast(t("settingsSaved")); })
+        .catch(function(){ $("btnDashEditSave").disabled = false; $("dashEditMsg").textContent = t("saveFailedRetry"); });
+    });
+  }
   function openDash_(){ dashOpen_ = true; $("dashOverlay").hidden = false; document.body.style.overflow = "hidden"; renderDashboard(); }
-  function closeDash_(){ dashOpen_ = false; $("dashOverlay").hidden = true; document.body.style.overflow = ""; }
+  $("btnDashEdit").addEventListener("click", function(){ dashEditing_ = !dashEditing_; renderDashboard(); });
+  function closeDash_(){ dashEditing_ = false; dashOpen_ = false; $("dashOverlay").hidden = true; document.body.style.overflow = ""; }
   function dashCsv_(){
     var m = dashModel_(), q = function(v){ v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var head = ["shop","tables","category","contact","phone","price","paid","balance","payment","statuses","slips","slips_verified","logo","issues"];
