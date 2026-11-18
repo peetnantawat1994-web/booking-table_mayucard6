@@ -838,6 +838,7 @@
     <div class="dash-top">
       <h2 id="dashTitle">แดชบอร์ดสรุป</h2>
       <div class="dash-actions">
+        <button type="button" class="btn btn-sm" id="btnDashCsvAll">CSV</button>
         <button type="button" class="btn btn-sm" id="btnDashCsv">CSV</button>
         <button type="button" class="btn btn-sm btn-primary" id="btnDashClose">✕</button>
       </div>
@@ -3555,7 +3556,7 @@
       tAll:"ทั้งหมด", tNoLogo:"ขาดโลโก้", tIssue:"ยังไม่ครบ (!)",
       zone:"โซน", total:"ทั้งหมด", booked:"จอง", locked:"ล็อก", free:"ว่าง", amount:"ยอดจอง", count:"จำนวน",
       shop:"ร้าน", tablesCol:"โต๊ะ", price:"ราคา", paid:"โอนแล้ว", balance:"คงเหลือ", status:"สถานะ", slipsCol:"สลิป", logo:"โลโก้", issues:"ประเด็น", pay:"การชำระ",
-      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
+      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV รายร้าน", csvAll:"CSV ทุกการจอง", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
     en:{ btn:"📊 Summary dashboard", title:"Back-office summary dashboard", sub:"Live data (auto-refreshing) · transferred amounts come from the slips attached in the system; fake slips cannot be detected",
       kTables:"Total tables", kBooked:"Booked", kFree:"Free (open)", kLocked:"Locked", kOcc:"Occupancy", kShops:"Shops",
       kExpected:"Total due", kReceived:"Total per slips", kVerified:"Verified slip amount", kOutstanding:"Outstanding", kPower:"Tables needing power",
@@ -3567,7 +3568,7 @@
       tAll:"All", tNoLogo:"No logo", tIssue:"Incomplete (!)",
       zone:"Zone", total:"Total", booked:"Booked", locked:"Locked", free:"Free", amount:"Booked value", count:"Count",
       shop:"Shop", tablesCol:"Tables", price:"Price", paid:"Paid", balance:"Balance", status:"Status", slipsCol:"Slips", logo:"Logo", issues:"Issues", pay:"Payment",
-      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV", shopsFmt:"{n} shops", noCat:"(none)" },
+      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV by shop", csvAll:"CSV all bookings", shopsFmt:"{n} shops", noCat:"(none)" },
     zh:{ btn:"📊 汇总仪表盘", title:"后台汇总仪表盘", sub:"实时数据（自动刷新）· 转账金额来自系统中附带的凭证，无法识别伪造凭证",
       kTables:"桌位总数", kBooked:"已订", kFree:"空位（开放）", kLocked:"已锁定", kOcc:"预订率", kShops:"商家数",
       kExpected:"应付总额", kReceived:"凭证合计", kVerified:"已核对凭证金额", kOutstanding:"未付金额", kPower:"需要用电的桌位",
@@ -3579,7 +3580,7 @@
       tAll:"全部", tNoLogo:"缺标志", tIssue:"未齐全 (!)",
       zone:"区域", total:"总数", booked:"已订", locked:"锁定", free:"空位", amount:"预订金额", count:"数量",
       shop:"商家", tablesCol:"桌位", price:"价格", paid:"已转", balance:"余额", status:"状态", slipsCol:"凭证", logo:"标志", issues:"问题", pay:"付款",
-      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV", shopsFmt:"{n} 家", noCat:"（未填）" }
+      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV 按商家", csvAll:"CSV 全部预订", shopsFmt:"{n} 家", noCat:"（未填）" }
   };
   function dt_(k, vars){
     var d = DASH_I18N[lang] || DASH_I18N.th, v = d[k] != null ? d[k] : (DASH_I18N.th[k] != null ? DASH_I18N.th[k] : k);
@@ -3702,7 +3703,7 @@
     if (!dashOpen_) return;
     if (!isAdmin || frontDeskMode){ closeDash_(); return; }
     var m = dashModel_();
-    $("dashTitle").textContent = dt_("title"); $("btnDashCsv").textContent = dt_("csv");
+    $("dashTitle").textContent = dt_("title"); $("btnDashCsv").textContent = dt_("csv"); $("btnDashCsvAll").textContent = dt_("csvAll");
     var keepScroll = document.querySelector("#dashOverlay") ? $("dashOverlay").scrollTop : 0;
     var focusSearch = document.activeElement && document.activeElement.id === "dashSearch";
     var rows = dashFilteredRows_(m);
@@ -3756,6 +3757,20 @@
     var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "mayucard6-shops-" + new Date().toISOString().slice(0, 10) + ".csv";
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
+  // every booking, one row per table (opens in Google Sheets / Excel; UTF-8 with BOM so Thai text is kept)
+  function dashCsvAll_(){
+    var q = function(v){ v = String(v == null ? "" : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var head = ["table","zone","shop","category","contact","phone","email","line","price","power","status","has_logo","slips","slips_verified","duplicate","created_at","note","issues"];
+    var rows = Object.values(bookings).sort(function(a, b){ return a.tableId.localeCompare(b.tableId, undefined, { numeric:true }); }).map(function(b){
+      var tb = tables[b.tableId], z = tb ? zones[tb.zoneKey] : null, sl = slipsForTable_(b.tableId);
+      return [b.tableId, z ? localizedText_(z.label) : "", b.shop, b.category, b.contact, b.phone, b.email, b.line, b.price, b.hasPower ? "yes" : "no", b.status || "pending",
+        (b.hasLogo || b.logoData) ? "yes" : "no", sl.length, sl.filter(function(x){ return x.status === "verified"; }).length, (b.dupOf && b.dupOf.length) ? "yes" : "no", b.createdAt || "", b.note, bookingIssues_(b).join(" | ")].map(q).join(",");
+    });
+    var blob = new Blob(["\ufeff" + [head.join(",")].concat(rows).join("\n")], { type:"text/csv;charset=utf-8" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "mayucard6-all-bookings-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  $("btnDashCsvAll").addEventListener("click", dashCsvAll_);
   $("btnDash").addEventListener("click", openDash_);
   $("btnDashClose").addEventListener("click", closeDash_);
   $("btnDashCsv").addEventListener("click", dashCsv_);
