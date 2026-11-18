@@ -453,7 +453,12 @@
     font-family:var(--font-mono); font-size:11px; font-weight:700; color:var(--ink-soft);
     background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:2px 6px; flex:0 0 auto;
   }
-  .booking-filters{display:flex; gap:8px; margin-bottom:4px;}
+  .booking-filters{display:flex; gap:8px; margin-bottom:4px; flex-wrap:wrap;}
+  .booking-filters .bl-search{flex:1 1 100%;}
+  .booking-filters .bl-search input{
+    width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid var(--line-strong); border-radius:var(--r-sm);
+    background:var(--surface); color:var(--ink); font-size:14px; font-family:inherit;
+  }
   .booking-filters select{
     flex:1; min-width:0; padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--r-sm);
     background:var(--surface); color:var(--ink); font-size:12.5px; font-family:inherit;
@@ -606,6 +611,10 @@
     <h2 id="bookingsSectionTitle">รายการจองทั้งหมด</h2>
   </div>
   <div class="booking-filters" id="bookingFilters" hidden>
+    <div class="bl-search">
+      <input type="search" id="blSearch" autocomplete="off" data-i18n-ph="searchPh" placeholder="ค้นหา โต๊ะ / ร้าน / หมวดหมู่ / ผู้ติดต่อ" />
+    </div>
+    <select id="blCategoryFilter"><option value="" data-i18n="categoryAll">ทุกหมวดหมู่</option></select>
     <select id="blStatusFilter">
       <option value="" data-i18n="statusAll">ทุกสถานะ</option>
       <option value="pending" data-i18n="statusPending">รอตรวจสอบ</option>
@@ -1318,7 +1327,7 @@
       slipTransferTime:"เวลาโอนตามสลิป", slipAmountSeen:"ยอดที่เห็นในสลิป (บาท)", slipVerdict:"ผลการตรวจ", slipNote:"หมายเหตุ",
       slipMarkPaid:"ทำเครื่องหมายว่า \"ชำระแล้ว\" ด้วย", slipSaveBtn:"บันทึกผลตรวจสลิป", slipSaved:"บันทึกผลตรวจสลิปแล้ว",
       slipExpectedFmt:"ยอดที่ต้องโอน {amount}", slipUploadedFmt:"ส่งสลิป {time}", slipTransferredFmt:"โอน {time}", slipWaitingTime:"ยังไม่ระบุเวลาโอน",
-      slipReleased:"การจองถูกปล่อย/ย้ายแล้ว", slipsEmpty:"ยังไม่มีสลิป", slipAttachFailed:"บันทึกการจองแล้ว แต่บันทึกข้อมูลสลิปไม่สำเร็จ", supabaseNotSet:"ยังไม่ได้ตั้งค่า Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"บัญชีนี้ไม่ใช่แอดมิน", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง",
+      slipReleased:"การจองถูกปล่อย/ย้ายแล้ว", slipsEmpty:"ยังไม่มีสลิป", slipAttachFailed:"บันทึกการจองแล้ว แต่บันทึกข้อมูลสลิปไม่สำเร็จ", supabaseNotSet:"ยังไม่ได้ตั้งค่า Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"บัญชีนี้ไม่ใช่แอดมิน", sessionExpired:"เซสชันแอดมินหมดอายุ กรุณาเข้าสู่ระบบใหม่", bookingNetworkError:"เชื่อมต่อไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองกดยืนยันอีกครั้ง", openFullSize:"เปิดดูขนาดเต็ม", bookingsEmpty:"ยังไม่มีการจอง", searchPh:"ค้นหา โต๊ะ / ร้าน / หมวดหมู่ / ผู้ติดต่อ", categoryAll:"ทุกหมวดหมู่", searchNoResult:"ไม่พบรายการที่ค้นหา", searchClear:"ล้างการค้นหา",
       pleaseEnterZoneName:"กรอกชื่อโซน", zoneSaved:"บันทึกโซนแล้ว", zoneDeleteBlocked:"ลบไม่ได้ เพราะยังมีโต๊ะใช้โซนนี้อยู่",
       zoneDeleted:"ลบโซนแล้ว", pleaseEnterFieldName:"กรอกชื่อฟิลด์", pleaseEnterOneOption:"กรอกตัวเลือกอย่างน้อย 1 รายการ",
       fieldSaved:"บันทึกฟิลด์แล้ว", fieldDeleted:"ลบฟิลด์แล้ว", settingsSaved:"บันทึกการตั้งค่าแล้ว",
@@ -1415,7 +1424,7 @@
       slipTransferTime:"Transfer time on the slip", slipAmountSeen:"Amount on the slip (THB)", slipVerdict:"Result", slipNote:"Note",
       slipMarkPaid:"Also mark the booking as \"Paid\"", slipSaveBtn:"Save slip review", slipSaved:"Slip review saved",
       slipExpectedFmt:"Due {amount}", slipUploadedFmt:"Slip sent {time}", slipTransferredFmt:"Transferred {time}", slipWaitingTime:"transfer time not entered",
-      slipReleased:"booking released/moved", slipsEmpty:"No slips yet", slipAttachFailed:"Booking saved, but the slip data could not be saved", supabaseNotSet:"Supabase is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"This account is not an admin", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet",
+      slipReleased:"booking released/moved", slipsEmpty:"No slips yet", slipAttachFailed:"Booking saved, but the slip data could not be saved", supabaseNotSet:"Supabase is not configured (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"This account is not an admin", sessionExpired:"Admin session expired — please log in again", bookingNetworkError:"Could not connect — check your internet and tap confirm again", openFullSize:"Open full size", bookingsEmpty:"No bookings yet", searchPh:"Search table / shop / category / contact", categoryAll:"All categories", searchNoResult:"No matching bookings", searchClear:"Clear search",
       pleaseEnterZoneName:"Please enter a zone name", zoneSaved:"Zone saved", zoneDeleteBlocked:"Can't delete — some tables still use this zone",
       zoneDeleted:"Zone deleted", pleaseEnterFieldName:"Please enter a field name", pleaseEnterOneOption:"Please enter at least one option",
       fieldSaved:"Field saved", fieldDeleted:"Field deleted", settingsSaved:"Settings saved",
@@ -1512,7 +1521,7 @@
       slipTransferTime:"凭证上的转账时间", slipAmountSeen:"凭证金额（泰铢）", slipVerdict:"核对结果", slipNote:"备注",
       slipMarkPaid:"同时标记预订为“已付款”", slipSaveBtn:"保存核对结果", slipSaved:"已保存核对结果",
       slipExpectedFmt:"应付 {amount}", slipUploadedFmt:"凭证提交于 {time}", slipTransferredFmt:"转账于 {time}", slipWaitingTime:"尚未录入转账时间",
-      slipReleased:"预订已释放/更换", slipsEmpty:"暂无凭证", slipAttachFailed:"预订已保存，但凭证信息保存失败", supabaseNotSet:"尚未配置 Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"此账号不是管理员", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订",
+      slipReleased:"预订已释放/更换", slipsEmpty:"暂无凭证", slipAttachFailed:"预订已保存，但凭证信息保存失败", supabaseNotSet:"尚未配置 Supabase (SUPABASE_URL / SUPABASE_ANON_KEY)", notAdminAccount:"此账号不是管理员", sessionExpired:"管理员登录已过期，请重新登录", bookingNetworkError:"无法连接，请检查网络后再次确认", openFullSize:"查看原图", bookingsEmpty:"暂无预订", searchPh:"搜索 摊位 / 店名 / 类别 / 联系人", categoryAll:"全部类别", searchNoResult:"没有匹配的预订", searchClear:"清除搜索",
       pleaseEnterZoneName:"请输入分区名称", zoneSaved:"分区已保存", zoneDeleteBlocked:"无法删除，仍有桌位使用此分区",
       zoneDeleted:"分区已删除", pleaseEnterFieldName:"请输入字段名称", pleaseEnterOneOption:"请至少输入一个选项",
       fieldSaved:"字段已保存", fieldDeleted:"字段已删除", settingsSaved:"设置已保存",
@@ -3560,11 +3569,28 @@
     }).join("");
     zSel.value = zCurrent;
 
+    var cSel = $("blCategoryFilter"), cCurrent = cSel.value;
+    var cats = {};
+    Object.values(bookings).forEach(function(b){ var c = (b.category||"").trim(); if (c) cats[c] = 1; });
+    cSel.innerHTML = '<option value="">'+esc(t("categoryAll"))+'</option>' + Object.keys(cats).sort().map(function(c){
+      return '<option value="'+esc(c)+'">'+esc(c)+'</option>';
+    }).join("");
+    cSel.value = cats[cCurrent] ? cCurrent : "";
+
     var statusF = $("blStatusFilter").value;
     var zoneF = $("blZoneFilter").value;
+    var catF = cSel.value;
+    var terms = ($("blSearch").value || "").toLowerCase().split(/\s+/).filter(Boolean);
     var list = Object.values(bookings).filter(function(b){
       if (statusF && (b.status||"pending") !== statusF) return false;
-      if (zoneF){ var tbl = tables[b.tableId]; if (!tbl || tbl.zoneKey !== zoneF) return false; }
+      if (catF && (b.category||"").trim() !== catF) return false;
+      var tbl = tables[b.tableId];
+      if (zoneF){ if (!tbl || tbl.zoneKey !== zoneF) return false; }
+      if (terms.length){
+        var z0 = tbl ? zones[tbl.zoneKey] : null;
+        var hay = [b.tableId, tbl && tbl.label, b.shop, b.category, b.contact, b.phone, b.email, b.line, z0 && localizedText_(z0.label)].join(" ").toLowerCase();
+        for (var i=0;i<terms.length;i++) if (hay.indexOf(terms[i]) < 0) return false;
+      }
       return true;
     }).sort(function(a,b){ return (b.createdAt||"").localeCompare(a.createdAt||""); });
 
@@ -3586,7 +3612,7 @@
         '<span class="status-badge st-'+esc(b.status||"pending")+'">'+statusLabel_(b.status)+'</span>'+
         '<span class="br-table mono">'+esc(b.tableId)+'</span>'+
       '</div>';
-    }).join("") || '<div class="empty-state">'+esc(t("bookingsEmpty"))+'</div>';
+    }).join("") || '<div class="empty-state">'+esc(t(terms.length || statusF || zoneF || catF ? "searchNoResult" : "bookingsEmpty"))+'</div>';
 
     panel.querySelectorAll(".booking-row").forEach(function(row){
       row.addEventListener("click", function(){ openBookingEditor(row.dataset.table); });
@@ -3594,6 +3620,8 @@
   }
   $("blStatusFilter").addEventListener("change", renderBookingsPanel);
   $("blZoneFilter").addEventListener("change", renderBookingsPanel);
+  $("blCategoryFilter").addEventListener("change", renderBookingsPanel);
+  $("blSearch").addEventListener("input", renderBookingsPanel);
 
   /* =========================================================
      ADMIN — zones manager panel
