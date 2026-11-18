@@ -2634,11 +2634,9 @@
       if (booking && isAdmin) ttip = t.id + " — " + (booking.shop || unnamedShopText_);
       el.title = ttip;
 
-      // logo pin: admin always sees it (to check it before confirming payment);
-      // everyone else only sees it once the admin has marked the booking paid/
-      // confirmed, so an unverified upload never shows publicly on the floor plan
-      var logoVerified = booking && (booking.status === "paid" || booking.status === "confirmed");
-      if (booking && booking.logoData && booking.logoData.dataUrl && (isAdmin || logoVerified)){
+      // logo pin: shop logos are shown on the map in admin mode only (to check them before
+      // confirming payment); customers and front-desk mode never see them
+      if (booking && booking.logoData && booking.logoData.dataUrl && showStatus_()){
         var pin = document.createElement("div");
         pin.className = "logo-pin";
         pin.innerHTML = imgTag_(booking.logoData.dataUrl);
