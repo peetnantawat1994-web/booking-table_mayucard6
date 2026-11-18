@@ -2402,6 +2402,8 @@
       var active = activeZoneFilter === z.key ? " is-active" : "";
       var zTables = tableList.filter(function(t){ return t.zoneKey === z.key; });
       var zFree = zTables.filter(function(t){ return !bookings[t.id] && !t.locked; }).length;
+      // zones made only of locked tables (card-teaching, SP) are not shown to customers as a bookable zone
+      if (!showStatus_() && zTables.length && zTables.every(function(t){ return t.locked && !bookings[t.id]; })) return "";
       var pct = zTables.length ? Math.round((zFree/zTables.length)*100) : 0;
       return '<button type="button" class="legend-chip'+dim+active+'" style="--zc:'+safeColor_(z.color)+'" data-zone="'+esc(z.key)+'">'+
         '<div class="zc-head"><span class="zc-label">'+esc(localizedText_(z.label))+'</span><span class="zc-price">'+fmtPrice(z.price)+'</span></div>'+
