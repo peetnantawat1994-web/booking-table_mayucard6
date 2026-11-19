@@ -762,7 +762,7 @@
       <div id="bkCustomFields"></div>
       <div id="bkPaymentInfo" hidden></div>
       <div class="field">
-        <label data-i18n="labelSlipOptional">สลิปโอนเงิน (ไม่บังคับ — แนบได้ทีหลัง)</label>
+        <label id="bkSlipLabel" data-i18n="labelSlipRequired">สลิปโอนเงิน (จำเป็น — ไม่แนบสลิปจะจองไม่สำเร็จ)</label>
         <div class="logo-pick">
           <div class="preview" id="bkSlipPreview">SLIP</div>
           <input type="file" id="bkSlipFile" accept="image/jpeg,image/png,image/webp,image/gif" />
@@ -1361,7 +1361,7 @@
       labelPhone:"เบอร์โทร", labelEmail:"อีเมล", labelLineOptional:"Line ID (ไม่บังคับ)", labelCategory:"ประเภทสินค้า",
       powerFeeLabel:"ต้องใช้ไฟฟ้าในบูท (+500 บาท)", powerFeeSub:"ติ๊กเฉพาะร้านที่ต้องใช้ปลั๊กไฟจริง", powerFeeLabelShort:"ใช้ไฟฟ้าในบูท (+500 บาท)",
       labelNoteOptional:"หมายเหตุ (ไม่บังคับ)", notePlaceholder:"เช่น ต้องการโต๊ะติดกับร้านเพื่อน",
-      labelSlipOptional:"สลิปโอนเงิน (ไม่บังคับ — แนบได้ทีหลัง)", labelLogoOptional:"โลโก้ร้าน (ไม่บังคับ)",
+      labelSlipOptional:"สลิปโอนเงิน (ไม่บังคับ — แนบได้ทีหลัง)", labelSlipRequired:"สลิปโอนเงิน (จำเป็น — ไม่แนบสลิปจะจองไม่สำเร็จ)", slipRequiredErr:"กรุณาแนบสลิปโอนเงินก่อนกดยืนยัน — ถ้าไม่มีสลิป การจองจะไม่สำเร็จ", labelLogoOptional:"โลโก้ร้าน (ไม่บังคับ)",
       confirmBooking:"ยืนยันการจอง",
       dragMoveHint:"ลากบนผังเพื่อย้ายตำแหน่ง · แตะเพื่อแก้ไขรายละเอียด", editFullBooking:"แก้ไขข้อมูลการจองทั้งหมด",
       labelZone:"โซน", labelTablePriceOverride:"ราคาเฉพาะโต๊ะนี้ (เว้นว่าง = ใช้ราคาโซน)", tablePricePlaceholder:"เช่น 4500",
@@ -1458,7 +1458,7 @@
       labelPhone:"Phone number", labelEmail:"Email", labelLineOptional:"Line ID (optional)", labelCategory:"Product category",
       powerFeeLabel:"Needs power at the booth (+500 THB)", powerFeeSub:"Check only if your shop really needs a power outlet", powerFeeLabelShort:"Needs power at the booth (+500 THB)",
       labelNoteOptional:"Note (optional)", notePlaceholder:"e.g. want a table next to a friend's shop",
-      labelSlipOptional:"Payment slip (optional — can attach later)", labelLogoOptional:"Shop logo (optional)",
+      labelSlipOptional:"Payment slip (optional — can attach later)", labelSlipRequired:"Payment slip (required — the booking is not completed without a slip)", slipRequiredErr:"Please attach your payment slip before confirming — a booking without a slip is not completed", labelLogoOptional:"Shop logo (optional)",
       confirmBooking:"Confirm booking",
       dragMoveHint:"Drag on the map to move it · Tap to edit details", editFullBooking:"Edit full booking details",
       labelZone:"Zone", labelTablePriceOverride:"Price for this table only (leave blank = use zone price)", tablePricePlaceholder:"e.g. 4500",
@@ -1555,7 +1555,7 @@
       labelPhone:"电话号码", labelEmail:"电子邮箱", labelLineOptional:"Line ID（选填）", labelCategory:"商品类别",
       powerFeeLabel:"需要在摊位用电（+500泰铢）", powerFeeSub:"仅限确实需要插座用电的店铺勾选", powerFeeLabelShort:"摊位用电（+500泰铢）",
       labelNoteOptional:"备注（选填）", notePlaceholder:"例如：希望与朋友的摊位相邻",
-      labelSlipOptional:"转账凭证（选填 — 可稍后补交）", labelLogoOptional:"店铺标志（选填）",
+      labelSlipOptional:"转账凭证（选填 — 可稍后补交）", labelSlipRequired:"转账凭证（必填 — 未附凭证则预订不成功）", slipRequiredErr:"请先附上转账凭证再确认 — 没有凭证预订不会成功", labelLogoOptional:"店铺标志（选填）",
       confirmBooking:"确认预订",
       dragMoveHint:"在图上拖动以移动位置 · 点击以编辑详情", editFullBooking:"编辑完整预订资料",
       labelZone:"分区", labelTablePriceOverride:"本桌专属价格（留空 = 使用分区价格）", tablePricePlaceholder:"例如 4500",
@@ -2990,6 +2990,7 @@
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
     bkSlipScan_ = null; $("bkSlipScan").className = "slip-scan"; $("bkSlipScan").textContent = "";
+    refreshSlipLabel_(); $("bkSlipFile").classList.remove("is-invalid");
     $("bkPower").checked = false;
     populateCategorySelect_($("bkCategory"));
     renderPaymentInfoBlock_();
@@ -3035,6 +3036,7 @@
     $("bkLogoFile").value = "";
     $("bkSlipFile").value = "";
     bkSlipScan_ = null; $("bkSlipScan").className = "slip-scan"; $("bkSlipScan").textContent = "";
+    refreshSlipLabel_(); $("bkSlipFile").classList.remove("is-invalid");
     $("bkPower").checked = false;
     populateCategorySelect_($("bkCategory"));
     renderPaymentInfoBlock_();
@@ -3072,7 +3074,7 @@
     if (!f) return;
     var badSlip = validateUpload_(f);
     if (badSlip){ $("bkErr").textContent = t(badSlip.key, badSlip.vars); this.value = ""; $("bkSlipPreview").innerHTML = "SLIP"; return; }
-    $("bkErr").textContent = "";
+    $("bkErr").textContent = ""; $("bkSlipFile").classList.remove("is-invalid");
     prepareFile_(f).then(function(dataUrl){
       $("bkSlipPreview").innerHTML = imgTag_(dataUrl) || "SLIP";
     });
@@ -3086,6 +3088,9 @@
       else { note.className = "slip-scan warn"; note.textContent = r.found ? t("slipQrOther") : t("slipQrNone"); }
     });
   });
+  // customers must attach a payment slip; an admin booking on someone's behalf may leave it out
+  function slipRequired_(){ return !showStatus_(); }
+  function refreshSlipLabel_(){ var l = $("bkSlipLabel"); if (l) l.textContent = t(slipRequired_() ? "labelSlipRequired" : "labelSlipOptional"); }
   $("bkForm").addEventListener("submit", function(e){
     e.preventDefault();
     if (_isPreviewFrame){ toast(t("previewNoBooking")); return; }
@@ -3107,6 +3112,11 @@
     if (vErr){ $("bkErr").textContent = t(vErr.key); var bad = $(vErr.field); if (bad){ bad.classList.add("is-invalid"); bad.focus(); } return; }
     var missingCustom = validateCustomRequired_("bk");
     if (missingCustom){ $("bkErr").textContent = t("pleaseEnterFmt", {field: missingCustom}); return; }
+    if (slipRequired_() && !$("bkSlipFile").files[0]){
+      $("bkErr").textContent = t("slipRequiredErr");
+      var sf = $("bkSlipFile"); sf.classList.add("is-invalid"); try{ sf.scrollIntoView({ block:"center", behavior:"smooth" }); sf.focus(); }catch(e){}
+      return;
+    }
     var runSubmit_ = function(dupConfirmed){
     var btn = $("btnBkSubmit");
     btn.disabled = true; btn.textContent = t("saving");
@@ -3169,7 +3179,9 @@
       btn.disabled = false; btn.textContent = t("confirmBooking");
       var msg = String((err && err.message) || "");
       console.error("mayucard6: booking failed", msg);
-      if (/already booked/i.test(msg)){
+      if (/slip required/i.test(msg)){
+        $("bkErr").textContent = t("slipRequiredErr");
+      } else if (/already booked/i.test(msg)){
         $("bkErr").textContent = t("tableAlreadyBooked");
         fetchAll(); // someone else got there first: show the table as taken
       } else if (/failed to fetch|network|load failed/i.test(msg)){
