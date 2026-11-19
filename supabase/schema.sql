@@ -94,6 +94,13 @@ language sql immutable as $$
   end;
 $$;
 
+-- a booking has a usable payment slip only if its slip file lives in this project's slip folder in storage
+-- (so a made-up link cannot satisfy the "slip required" rule)
+create or replace function public._has_slip_file(v jsonb) returns boolean
+language sql immutable as $$
+  select coalesce((v->'slipData'->>'dataUrl') ~ '^https://[^/]+/storage/v1/object/public/uploads/slip/[^\s"''<>]+$', false);
+$$;
+
 create or replace function public._num(v text) returns numeric
 language sql immutable as $$
   select case when v ~ '^\s*\d+(\.\d+)?\s*$' then v::numeric end;
@@ -189,6 +196,10 @@ begin
     raise exception 'table locked';
   end if;
   v := public._stamp_dups(public._clean_booking(p_table_id, p_data, null), p_data, null);
+  -- a customer booking without a payment slip is not accepted (admins may book on behalf of someone)
+  if not public.is_admin() and not public._has_slip_file(v) then
+    raise exception 'slip required';
+  end if;
   insert into public.documents (store, collection, id, data)
   values ('live', 'bookings', p_table_id, v)
   on conflict (store, collection, id) do nothing;   -- the primary key makes double-booking impossible
@@ -216,6 +227,9 @@ begin
       continue;
     end if;
     v := public._stamp_dups(public._clean_booking(tid, item->'data', g), item->'data', g);
+    if not public.is_admin() and not public._has_slip_file(v) then
+      raise exception 'slip required';   -- aborts the whole call: nothing is booked
+    end if;
     insert into public.documents (store, collection, id, data)
     values ('live', 'bookings', tid, v)
     on conflict (store, collection, id) do nothing;
