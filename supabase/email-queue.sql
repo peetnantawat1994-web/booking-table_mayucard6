@@ -11,9 +11,24 @@ create table if not exists public.email_settings (
   token_hash  text,
   updated_at  timestamptz not null default now()
 );
+alter table public.email_settings add column if not exists delay_minutes int not null default 10;   -- grace period before an e-mail goes out
 insert into public.email_settings (id) values (1) on conflict (id) do nothing;
 alter table public.email_settings enable row level security;
 revoke all on public.email_settings from anon, authenticated;
+
+-- when a shop first became "due" (starts the grace period; reset if it stops being due) and shops the admin put on hold
+create table if not exists public.email_pending (
+  shop_key     text primary key,
+  first_due_at timestamptz not null default now()
+);
+alter table public.email_pending enable row level security;
+revoke all on public.email_pending from anon, authenticated;
+create table if not exists public.email_hold (
+  shop_key text primary key,
+  held_at  timestamptz not null default now()
+);
+alter table public.email_hold enable row level security;
+revoke all on public.email_hold from anon, authenticated;
 
 create table if not exists public.email_outbox (
   shop_key    text primary key,
@@ -70,20 +85,29 @@ language sql stable security definer set search_path = public as $$
     and not exists (select 1 from public.email_outbox o where o.shop_key = g.shop_key and (o.status = 'sent' or o.attempts >= 3));
 $$;
 
--- called by the sender script (token-protected)
+-- called by the sender script (token-protected). Also keeps the grace-period clock.
 create or replace function public.email_queue_fetch(p_token text, p_limit int default 10) returns jsonb
-language plpgsql stable security definer set search_path = public as $$
-declare m text; items jsonb; bad jsonb;
+language plpgsql volatile security definer set search_path = public as $$
+declare m text; dl int; items jsonb; bad jsonb; waiting jsonb;
 begin
   if not public._email_token_ok(p_token) then raise exception 'not authorized' using errcode = '42501'; end if;
-  select mode into m from public.email_settings where id = 1;
-  if m = 'off' then return jsonb_build_object('mode', 'off', 'items', '[]'::jsonb, 'invalid', '[]'::jsonb); end if;
+  select mode, delay_minutes into m, dl from public.email_settings where id = 1;
+  if m = 'off' then return jsonb_build_object('mode', 'off', 'items', '[]'::jsonb, 'invalid', '[]'::jsonb, 'waiting', '[]'::jsonb); end if;
+  insert into public.email_pending (shop_key) select shop_key from public._email_due() on conflict do nothing;
+  delete from public.email_pending where shop_key not in (select shop_key from public._email_due());   -- stopped being due: the clock restarts
   select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into items from (
-    select shop_key as "shopKey", shop, contact, email, tables, lines, total, paid, has_logo as "hasLogo"
-    from public._email_due() where valid_email order by shop_key limit greatest(1, least(coalesce(p_limit, 10), 50))) x;
+    select d.shop_key as "shopKey", d.shop, d.contact, d.email, d.tables, d.lines, d.total, d.paid, d.has_logo as "hasLogo"
+    from public._email_due() d join public.email_pending p on p.shop_key = d.shop_key
+    where d.valid_email and not exists (select 1 from public.email_hold h where h.shop_key = d.shop_key)
+      and p.first_due_at <= now() - make_interval(mins => dl)
+    order by p.first_due_at limit greatest(1, least(coalesce(p_limit, 10), 50))) x;
+  select coalesce(jsonb_agg(jsonb_build_object('shopKey', d.shop_key, 'shop', d.shop, 'sendAt', p.first_due_at + make_interval(mins => dl))), '[]'::jsonb) into waiting
+    from public._email_due() d join public.email_pending p on p.shop_key = d.shop_key
+    where d.valid_email and not exists (select 1 from public.email_hold h where h.shop_key = d.shop_key)
+      and p.first_due_at > now() - make_interval(mins => dl);
   select coalesce(jsonb_agg(jsonb_build_object('shopKey', shop_key, 'shop', shop, 'email', email)), '[]'::jsonb) into bad
     from public._email_due() where not valid_email;
-  return jsonb_build_object('mode', m, 'items', items, 'invalid', bad);
+  return jsonb_build_object('mode', m, 'items', items, 'invalid', bad, 'waiting', waiting);
 end $$;
 
 create or replace function public.email_queue_mark(p_token text, p_results jsonb) returns jsonb
@@ -129,13 +153,45 @@ end $$;
 
 create or replace function public.admin_email_status() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
+declare dl int;
 begin
   perform public._require_admin();
+  select delay_minutes into dl from public.email_settings where id = 1;
   return jsonb_build_object(
     'mode', (select mode from public.email_settings where id = 1),
     'hasToken', (select token_hash is not null from public.email_settings where id = 1),
-    'due',      coalesce((select jsonb_agg(jsonb_build_object('shop', shop, 'email', email, 'tables', tables, 'total', total, 'paid', paid, 'validEmail', valid_email) order by shop) from public._email_due()), '[]'::jsonb),
-    'sent',     coalesce((select jsonb_agg(jsonb_build_object('shop', shop, 'email', to_email, 'status', status, 'attempts', attempts, 'sentAt', sent_at, 'error', error) order by updated_at desc) from public.email_outbox), '[]'::jsonb));
+    'delayMinutes', dl,
+    'due', coalesce((select jsonb_agg(jsonb_build_object('shopKey', d.shop_key, 'shop', d.shop, 'email', d.email, 'tables', d.tables, 'total', d.total, 'paid', d.paid,
+              'validEmail', d.valid_email, 'held', exists (select 1 from public.email_hold h where h.shop_key = d.shop_key),
+              'sendAt', coalesce(p.first_due_at, now()) + make_interval(mins => dl)) order by d.shop)
+              from public._email_due() d left join public.email_pending p on p.shop_key = d.shop_key), '[]'::jsonb),
+    'sent', coalesce((select jsonb_agg(jsonb_build_object('shop', shop, 'email', to_email, 'status', status, 'attempts', attempts, 'sentAt', sent_at, 'error', error) order by updated_at desc) from public.email_outbox), '[]'::jsonb));
+end $$;
+
+create or replace function public.admin_email_hold(p_shop_key text) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  insert into public.email_hold (shop_key) values (p_shop_key) on conflict do nothing;
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_email_release(p_shop_key text) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  delete from public.email_hold where shop_key = p_shop_key;
+  update public.email_pending set first_due_at = now() where shop_key = p_shop_key;   -- released: the grace period starts again
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_email_set_delay(p_minutes int) returns jsonb
+language plpgsql volatile security definer set search_path = public as $$
+begin
+  perform public._require_admin();
+  if p_minutes is null or p_minutes < 0 or p_minutes > 120 then raise exception 'bad delay'; end if;
+  update public.email_settings set delay_minutes = p_minutes, updated_at = now() where id = 1;
+  return jsonb_build_object('ok', true, 'delayMinutes', p_minutes);
 end $$;
 
 -- let a shop be e-mailed again (e.g. after its tables changed)
@@ -144,6 +200,8 @@ language plpgsql volatile security definer set search_path = public as $$
 begin
   perform public._require_admin();
   delete from public.email_outbox where shop_key = p_shop_key;
+  delete from public.email_pending where shop_key = p_shop_key;
+  delete from public.email_hold where shop_key = p_shop_key;
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -153,3 +211,6 @@ grant execute on function public.admin_email_set_mode(text)         to authentic
 grant execute on function public.admin_email_set_token(text)        to authenticated;
 grant execute on function public.admin_email_status()               to authenticated;
 grant execute on function public.admin_email_reset(text)            to authenticated;
+grant execute on function public.admin_email_hold(text)             to authenticated;
+grant execute on function public.admin_email_release(text)          to authenticated;
+grant execute on function public.admin_email_set_delay(int)         to authenticated;

@@ -20,8 +20,8 @@ var CONFIG = {
   EVENT_INFO_TEXT: '',     // optional paragraph about the event day (dates, place, load-in time...). Empty = not included.
   CONTACT_LINE: '',        // optional, e.g. 'ติดต่อทีมงานทาง LINE: @xxxx'
   ASK_FOR_LOGO: true,      // add the 'please send your logo' paragraph for shops whose logo is not in the system yet (false = never ask)
-  APPROVAL_MODE: true,     // true = the timer only CREATES Gmail drafts for you to review; nothing is sent until you run sendApprovedDrafts
-  MAX_PER_RUN: 10          // e-mails per run (the trigger runs every 10 minutes)
+  APPROVAL_MODE: false,    // false = AUTOMATIC: shops that meet the rule get their e-mail after the grace period set in the booking system (default 10 min; admins can put a shop on hold). true = only create Gmail drafts, you send them yourself with sendApprovedDrafts
+  MAX_PER_RUN: 10          // e-mails per run (the trigger runs every minute)
 };
 
 function subject_(item) { return 'ยืนยันการจองบูท MAYUCARD 6 – ร้าน ' + item.shop; }
@@ -76,6 +76,7 @@ function run() {
     var q = fetchQueue_(CONFIG.MAX_PER_RUN);
     if (q.mode === 'off') { console.log('mode is OFF: nothing to do'); return; }
     if (q.invalid && q.invalid.length) console.log('Skipped (bad e-mail address): ' + q.invalid.map(function (x) { return x.shop + ' <' + x.email + '>'; }).join('; '));
+    if (q.waiting && q.waiting.length) console.log('Waiting out the grace period: ' + q.waiting.map(function (w) { return w.shop + ' (until ' + w.sendAt + ')'; }).join('; '));
     if (q.mode === 'dry') {
       console.log('DRY RUN — would send ' + q.items.length + ' e-mail(s) in this batch (nothing is sent):');
       q.items.forEach(function (i) { console.log(' - ' + i.shop + ' <' + i.email + '> tables ' + i.tables.join(' ') + ' total ' + i.total); });
@@ -109,8 +110,8 @@ function sendTestToMe() {
 
 function installTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'run') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('run').timeBased().everyMinutes(10).create();
-  console.log('Trigger installed: run() every 10 minutes');
+  ScriptApp.newTrigger('run').timeBased().everyMinutes(1).create();
+  console.log('Trigger installed: run() every minute');
 }
 function removeTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'run') ScriptApp.deleteTrigger(t); });
