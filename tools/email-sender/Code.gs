@@ -114,3 +114,15 @@ function removeTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'run') ScriptApp.deleteTrigger(t); });
   console.log('Trigger removed');
 }
+
+// Sends the FIRST due shop's e-mail to YOURSELF exactly as a customer would receive it (no "[ทดสอบ]" label, no extra line).
+// Still goes only to the account that is logged in. Nothing is sent to the customer and nothing is marked as sent.
+function sendPreviewToMe() {
+  var q = fetchQueue_(1);
+  if (!q.items || !q.items.length) { console.log('No shop is due right now (mode: ' + q.mode + ')'); return; }
+  var me = Session.getEffectiveUser().getEmail(), item = q.items[0];
+  var opts = { name: CONFIG.SENDER_NAME };
+  if (CONFIG.REPLY_TO) opts.replyTo = CONFIG.REPLY_TO;
+  GmailApp.sendEmail(me, subject_(item), buildBody_(item, CONFIG), opts);
+  console.log('Preview sent to ' + me + ' (looks exactly like the real e-mail for ' + item.shop + '; it was NOT sent to the customer)');
+}
