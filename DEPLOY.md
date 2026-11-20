@@ -41,3 +41,8 @@
    (drops the `v2` flags, deletes B03–B05 which are not on the new plan). Until then, dragging a table in layout
    edit mode may snap back because the `v2` position still wins.
 Rollback: Netlify "Publish deploy" of the previous deploy; restore the data from the JSON backup if needed.
+
+## Floor plan v3 (new map image 1550×1015) — two-step rollout
+1. **Before merging** (safe, the live page keeps working): run `supabase/layout-v3.sql` — adds a `v3` position to every table (only the new page reads it) and renames the SP / teach zones to "สอนเล่นการ์ด" / "Trading Zone (ห้ามตั้งขายสินค้า)". Lock / reserved flags are not touched.
+2. Merge the PR (new image + `v3` positions used by the page).
+3. **After the new page is live**: run `supabase/layout-v3-finalize.sql` to make the new positions permanent.
