@@ -3,7 +3,8 @@
 -- Idempotent. The database never sends mail itself: a small Google Apps Script in the sender's Google
 -- account asks "who is due an e-mail?", sends it from that account, then reports back (see tools/email-sender).
 -- Safety: mode 'off' (default) | 'dry' (list only, nothing is sent) | 'live'. Every call needs a secret token.
--- Rule (option A): every table of the shop is confirmed/paid AND the read slip amounts cover the price.
+-- Rule: every table of the shop is confirmed/paid (the admin checks the slips before confirming). The read slip amount is shown
+-- to the admins as information only (slipOk) and does not block sending.
 -- Control per shop (admin): send = approved (goes out within a minute) | review = on hold | cancel = never.
 -- No decision = "ready": sent only if the admin switch "auto send" is on, after the grace period.
 -- =====================================================================
@@ -97,13 +98,13 @@ language sql stable security definer set search_path = public as $$
   from x;
 $$;
 
--- which shops meet the rule right now (and have not been sent / given up on)
+-- which shops meet the rule right now = all tables confirmed/paid (and not yet sent / given up on)
 create or replace function public._email_due() returns table (
   shop_key text, shop text, contact text, email text, tables text[], lines jsonb, total numeric, paid numeric, has_logo boolean, valid_email boolean)
 language sql stable security definer set search_path = public as $$
   select s.shop_key, s.shop, s.contact, s.email, s.tables, s.lines, s.total, s.paid, s.has_logo, s.valid_email
   from public._email_shops() s
-  where s.all_ok and s.paid_ok
+  where s.all_ok
     and not exists (select 1 from public.email_outbox o where o.shop_key = s.shop_key and (o.status = 'sent' or o.attempts >= 3));
 $$;
 
@@ -182,7 +183,7 @@ begin
 end $$;
 
 -- one row per shop with a plain state for the dashboard:
--- sent | failed | queued (will go out) | ready (waiting for an admin or the auto switch) | hold | cancelled | notready (reason: tables | slip)
+-- sent | failed | queued (will go out) | ready (waiting for an admin or the auto switch) | hold | cancelled | notready (a table is not confirmed yet)
 create or replace function public.admin_email_status() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 declare dl int;
@@ -198,12 +199,12 @@ begin
       select s.shop_key as "shopKey", s.shop, s.email, s.tables, s.total, s.paid, s.valid_email as "validEmail", s.n_open as "nOpen",
         case when o.status = 'sent' then 'sent'
              when o.status = 'failed' and o.attempts >= 3 then 'failed'
-             when not (s.all_ok and s.paid_ok) then 'notready'
+             when not s.all_ok then 'notready'
              when n.decision = 'cancelled' then 'cancelled'
              when n.decision = 'hold' then 'hold'
              when n.decision = 'approved' or (e.auto_send and s.valid_email) then 'queued'
              else 'ready' end as state,
-        case when s.all_ok and s.paid_ok then null when not s.all_ok then 'tables' else 'slip' end as reason,
+        case when s.all_ok then null else 'tables' end as reason, s.paid_ok as "slipOk",
         case when n.decision = 'approved' then null else p.first_due_at + make_interval(mins => e.delay_minutes) end as "sendAt",
         o.sent_at as "sentAt", o.attempts, o.error, coalesce(o.approved_by, n.by_email) as "by", n.decision, n.decided_at as "decidedAt"
       from public._email_shops() s cross join public.email_settings e
