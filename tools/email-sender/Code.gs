@@ -20,6 +20,7 @@ var CONFIG = {
   EVENT_INFO_TEXT: '',     // optional paragraph about the event day (dates, place, load-in time...). Empty = not included.
   CONTACT_LINE: '',        // optional, e.g. 'ติดต่อทีมงานทาง LINE: @xxxx'
   ASK_FOR_LOGO: true,      // add the 'please send your logo' paragraph for shops whose logo is not in the system yet (false = never ask)
+  APPROVAL_MODE: true,     // true = the timer only CREATES Gmail drafts for you to review; nothing is sent until you run sendApprovedDrafts
   MAX_PER_RUN: 10          // e-mails per run (the trigger runs every 10 minutes)
 };
 
@@ -68,6 +69,7 @@ function mark_(results) { return rpc_('email_queue_mark', { p_token: props_().ge
 
 // Run this by the trigger (see installTrigger). Sends only when the system's mode is 'live'.
 function run() {
+  if (CONFIG.APPROVAL_MODE) { createDrafts(); return; }   // approval mode: the timer never sends, it only prepares drafts
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) { console.log('another run is in progress'); return; }
   try {
@@ -125,4 +127,70 @@ function sendPreviewToMe() {
   if (CONFIG.REPLY_TO) opts.replyTo = CONFIG.REPLY_TO;
   GmailApp.sendEmail(me, subject_(item), buildBody_(item, CONFIG), opts);
   console.log('Preview sent to ' + me + ' (looks exactly like the real e-mail for ' + item.shop + '; it was NOT sent to the customer)');
+}
+
+// ================= APPROVAL FLOW: drafts first, you approve, then send =================
+// 1) createDrafts()        puts one Gmail DRAFT per due shop into this account's Drafts folder (label 'MAYUCARD6 รออนุมัติ').
+//                          Review / edit them in Gmail. Delete a draft you do not want to send.
+// 2) (ask the admin to switch the system to 'live' once you approve)
+// 3) sendApprovedDrafts()  sends the drafts that are still waiting and records them in the booking system.
+// discardDrafts() deletes all waiting drafts (e.g. to start over).
+var DRAFT_LABEL = 'MAYUCARD6 รออนุมัติ';
+var DRAFT_PREFIX = 'draft_';
+function draftLabel_() { return GmailApp.getUserLabelByName(DRAFT_LABEL) || GmailApp.createLabel(DRAFT_LABEL); }
+function loadDraftRef_(key) { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(key)); } catch (e) { return null; } }
+function findDraft_(id) { var all = GmailApp.getDrafts(); for (var i = 0; i < all.length; i++) { if (all[i].getId() === id) return all[i]; } return null; }
+
+function createDrafts() {
+  var q = fetchQueue_(50);
+  if (q.mode === 'off') { console.log('mode is OFF: no drafts created'); return; }
+  if (q.invalid && q.invalid.length) console.log('Skipped (bad e-mail address): ' + q.invalid.map(function (x) { return x.shop + ' <' + x.email + '>'; }).join('; '));
+  var made = 0, kept = 0;
+  q.items.forEach(function (item) {
+    var key = DRAFT_PREFIX + item.shopKey, ref = loadDraftRef_(key);
+    if (ref && findDraft_(ref.id)) { kept++; return; }          // already has a draft waiting
+    var opts = { name: CONFIG.SENDER_NAME };
+    if (CONFIG.REPLY_TO) opts.replyTo = CONFIG.REPLY_TO;
+    if (CONFIG.BCC) opts.bcc = CONFIG.BCC;
+    var d = GmailApp.createDraft(item.email, subject_(item), buildBody_(item, CONFIG), opts);
+    try { d.getMessage().getThread().addLabel(draftLabel_()); } catch (e) {}
+    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify({ id: d.getId(), total: item.total, tables: item.tables, email: item.email }));
+    made++;
+  });
+  console.log('Drafts created: ' + made + ', already waiting: ' + kept + '. Open Gmail > Drafts (label "' + DRAFT_LABEL + '") to review.');
+}
+
+function sendApprovedDrafts() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) { console.log('another run is in progress'); return; }
+  try {
+    var q = fetchQueue_(50);
+    if (q.mode !== 'live') { console.log('The booking system is not in LIVE mode (now: ' + q.mode + '). Ask the admin to approve/switch first. Nothing was sent.'); return; }
+    var due = {}; q.items.forEach(function (i) { due[i.shopKey] = i; });
+    var props = PropertiesService.getScriptProperties().getProperties(), sent = 0, skipped = 0, quota = MailApp.getRemainingDailyQuota();
+    Object.keys(props).filter(function (k) { return k.indexOf(DRAFT_PREFIX) === 0; }).forEach(function (key) {
+      var shopKey = key.slice(DRAFT_PREFIX.length), ref = loadDraftRef_(key), item = due[shopKey];
+      var d = ref && findDraft_(ref.id);
+      if (!d) { PropertiesService.getScriptProperties().deleteProperty(key); console.log('draft gone (deleted in Gmail), skipped: ' + shopKey); skipped++; return; }
+      if (!item) { console.log('NOT sent (no longer due in the booking system): ' + shopKey); skipped++; return; }
+      if (Number(item.total) !== Number(ref.total) || String(item.tables) !== String(ref.tables)) { console.log('NOT sent (tables/amount changed since the draft was made; run discardDrafts then createDrafts): ' + item.shop); skipped++; return; }
+      if (quota <= 0) { console.log('Daily mail quota reached; left for later: ' + item.shop); skipped++; return; }
+      var result = { shopKey: shopKey, status: 'sent' };
+      try { d.send(); quota--; } catch (e) { result = { shopKey: shopKey, status: 'failed', error: String(e).slice(0, 250) }; }
+      mark_([result]);                       // recorded straight away: never a duplicate
+      if (result.status === 'sent') { PropertiesService.getScriptProperties().deleteProperty(key); sent++; }
+      console.log(result.status + ': ' + item.shop + ' <' + item.email + '>');
+    });
+    console.log('Done. Sent: ' + sent + ', not sent: ' + skipped);
+  } finally { lock.releaseLock(); }
+}
+
+function discardDrafts() {
+  var props = PropertiesService.getScriptProperties().getProperties(), n = 0;
+  Object.keys(props).filter(function (k) { return k.indexOf(DRAFT_PREFIX) === 0; }).forEach(function (key) {
+    var ref = loadDraftRef_(key), d = ref && findDraft_(ref.id);
+    if (d) { try { d.deleteDraft(); } catch (e) {} }
+    PropertiesService.getScriptProperties().deleteProperty(key); n++;
+  });
+  console.log('Discarded ' + n + ' waiting draft(s)');
 }
