@@ -523,6 +523,18 @@
   .dash-tab.is-active{background:var(--ink); color:var(--bg); border-color:var(--ink);}
   .dash-search{width:100%; box-sizing:border-box; padding:8px 11px; border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--ink); font-size:13px; font-family:inherit; margin-bottom:6px;}
   .dash-pill{display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700; background:var(--surface-2); border:1px solid var(--line);}
+  .em-ic{width:13px;height:13px;vertical-align:-2px;margin-right:5px;flex:none;}
+  .btn .em-ic{width:14px;height:14px;vertical-align:-2px;}
+  .dash-pill.info{background:#e1edfb; color:#1a4f8f; border-color:#b8d3f2;} .dash-pill.mute{background:var(--surface-2); color:var(--ink-faint);}
+  .dash-pill.em{display:inline-flex; align-items:center; padding:2px 9px 2px 7px;}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .dash-pill.info{background:#122a45;color:#9cc7f5;border-color:#1f4670;} }
+  :root[data-theme="dark"] .dash-pill.info{background:#122a45;color:#9cc7f5;border-color:#1f4670;}
+  .em-switch{display:inline-flex; align-items:center; gap:8px; padding:3px 12px 3px 4px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+  .em-switch .knob{position:relative; width:34px; height:20px; border-radius:999px; background:#b9bec7; transition:background .15s; flex:none;}
+  .em-switch .knob::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); transition:transform .15s;}
+  .em-switch[data-on="1"] .knob{background:#2e9e4f;} .em-switch[data-on="1"] .knob::after{transform:translateX(14px);}
+  .em-actions{display:flex; gap:6px; flex-wrap:wrap;}
+  .em-actions .btn{display:inline-flex; align-items:center;}
   .dash-pill.ok{background:#e3f5e8; color:#1e6e34; border-color:#b9e2c4;} .dash-pill.warn{background:#fff1d6; color:#8a5a00; border-color:#f1d9a0;} .dash-pill.bad{background:#fde4e2; color:#a52a1f; border-color:#f3bcb7;}
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .dash-pill.ok{background:#16351f;color:#8fe0a6;border-color:#245a33;} :root:not([data-theme="light"]) .dash-pill.warn{background:#3a2c0c;color:#f2c874;border-color:#5a4416;} :root:not([data-theme="light"]) .dash-pill.bad{background:#3d1613;color:#f3a39b;border-color:#6a2520;} }
   :root[data-theme="dark"] .dash-pill.ok{background:#16351f;color:#8fe0a6;border-color:#245a33;} :root[data-theme="dark"] .dash-pill.warn{background:#3a2c0c;color:#f2c874;border-color:#5a4416;} :root[data-theme="dark"] .dash-pill.bad{background:#3d1613;color:#f3a39b;border-color:#6a2520;}
@@ -3679,7 +3691,7 @@
       tAll:"ทั้งหมด", tNoLogo:"ขาดโลโก้", tIssue:"ยังไม่ครบ (!)",
       zone:"โซน", total:"ทั้งหมด", booked:"จอง", locked:"ล็อก", free:"ว่าง", amount:"ยอดจอง", count:"จำนวน",
       shop:"ร้าน", tablesCol:"โต๊ะ", price:"ราคา", paid:"โอนแล้ว", balance:"คงเหลือ", status:"สถานะ", slipsCol:"สลิป", logo:"โลโก้", issues:"ประเด็น", pay:"การชำระ",
-      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV รายร้าน", hEmail:"อีเมลยืนยันถึงลูกค้า", emMode:"โหมด", emOff:"ปิด (ไม่ส่ง)", emDry:"ซ้อม (ยังไม่ส่งจริง)", emLive:"ส่งจริง", emDelay:"หน่วงก่อนส่ง {n} นาที", emStop:"⛔ หยุดส่งทั้งหมด", emStopConfirm:"หยุดการส่งอีเมลถึงลูกค้าทั้งหมดตอนนี้?", emAutoOn:"✅ ส่งอัตโนมัติ: เปิด", emAutoOff:"ส่งอัตโนมัติเมื่อครบเงื่อนไข: ปิด", emAutoConfirm:"เปิดส่งอัตโนมัติ? ร้านที่ครบเงื่อนไขและยังไม่ได้ตัดสินใจ ({n} ร้าน) จะถูกส่งอีเมลหลังรอ {m} นาที (ร้านที่กด รอตรวจสอบ/ยกเลิก จะไม่ถูกส่ง)", emNotLive:"ตอนนี้ยังไม่ใช่โหมดส่งจริง การกดส่งจะเป็นเพียงการอนุมัติ ยังไม่มีอีเมลถึงลูกค้าจนกว่าจะเปิดโหมดส่งจริง", emSend:"ส่งอีเมล", emReview:"รอตรวจสอบ", emCancel:"ยกเลิกการส่ง", emResend:"ส่งซ้ำ", emSendConfirm:"ส่งอีเมลยืนยันถึง {shop} ({mail}) ใช่ไหม? ส่งแล้วเรียกคืนไม่ได้", emResendConfirm:"ส่งอีเมลซ้ำถึง {shop} ({mail}) ใช่ไหม?", emCancelConfirm:"ยกเลิกการส่งอีเมลถึง {shop}? (กดส่งใหม่ได้ภายหลัง)", emSt_sent:"✅ ส่งแล้ว", emSt_queued:"⏳ กำลังจะส่ง", emSt_ready:"🟦 พร้อมส่ง", emSt_hold:"🟨 รอตรวจสอบ", emSt_cancelled:"⛔ ยกเลิก", emSt_failed:"❌ ส่งไม่สำเร็จ", emSt_notready:"➖ ยังไม่ครบเงื่อนไข", emQueuedNow:"อนุมัติแล้ว ส่งภายใน 1 นาที", emQueuedAuto:"ส่งอัตโนมัติเวลา {t}", emWhyTables:"ยังมี {n} โต๊ะที่ยังไม่ยืนยัน/ชำระ", emWhySlip:"ยอดสลิปที่อ่านได้ {paid}/{total}", emFAll:"ทุกร้าน", emFUnsent:"ยังไม่ส่ง", emFSent:"ส่งแล้ว", emFNot:"ยังไม่ครบเงื่อนไข", emBadEmail:"อีเมลไม่ถูกรูปแบบ", emColShop:"ร้าน", emColMail:"อีเมล", emColState:"สถานะ", emNone:"ไม่มีร้านในรายการนี้", emLoadFail:"โหลดสถานะอีเมลไม่สำเร็จ", emRule:"ร้านจะพร้อมส่งเมื่อทุกโต๊ะยืนยันแล้ว/ชำระแล้ว และยอดสลิปที่อ่านแล้วครบ จากนั้นแอดมินกด ส่งอีเมล (หรือเปิดส่งอัตโนมัติ)",  editBtn:"✏️ แก้ไขข้อความ", editCancel:"ยกเลิก", editSave:"บันทึก", editReset:"คืนค่าเดิม", editResetConfirm:"คืนข้อความและการแสดงผลทั้งหมดของแดชบอร์ดเป็นค่าเดิม?", editHelp:"แก้ข้อความของภาษา {lang} (ภาษาที่เลือกอยู่) · เว้นว่างหรือพิมพ์เหมือนเดิม = ใช้ข้อความเดิม · ติ๊กออกเพื่อซ่อนส่วนนั้น", editSections:"ส่วนที่แสดง", editTexts:"ข้อความทุกจุด", editOriginal:"ข้อความเดิม", editYours:"ข้อความของคุณ", secKpis:"ตัวเลขสรุปรวม",  csvAll:"CSV ทุกการจอง", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
+      search:"ค้นหาร้าน / โต๊ะ / หมวดหมู่ / ผู้ติดต่อ", none:"ไม่พบรายการ", yes:"มี", no:"ไม่มี", csv:"CSV รายร้าน", hEmail:"อีเมลยืนยันถึงลูกค้า", emMode:"โหมด", emOff:"ปิด (ไม่ส่ง)", emDry:"ซ้อม (ยังไม่ส่งจริง)", emLive:"ส่งจริง", emDelay:"หน่วงก่อนส่ง {n} นาที", emStop:"หยุดส่งทั้งหมด", emStopConfirm:"หยุดการส่งอีเมลถึงลูกค้าทั้งหมดตอนนี้?", emAutoOn:"ส่งอัตโนมัติ: เปิด", emAutoOff:"ส่งอัตโนมัติเมื่อครบเงื่อนไข: ปิด", emAutoConfirm:"เปิดส่งอัตโนมัติ? ร้านที่ครบเงื่อนไขและยังไม่ได้ตัดสินใจ ({n} ร้าน) จะถูกส่งอีเมลหลังรอ {m} นาที (ร้านที่กด รอตรวจสอบ/ยกเลิก จะไม่ถูกส่ง)", emNotLive:"ตอนนี้ยังไม่ใช่โหมดส่งจริง การกดส่งจะเป็นเพียงการอนุมัติ ยังไม่มีอีเมลถึงลูกค้าจนกว่าจะเปิดโหมดส่งจริง", emSend:"ส่งอีเมล", emReview:"รอตรวจสอบ", emCancel:"ยกเลิกการส่ง", emResend:"ส่งซ้ำ", emSendConfirm:"ส่งอีเมลยืนยันถึง {shop} ({mail}) ใช่ไหม? ส่งแล้วเรียกคืนไม่ได้", emResendConfirm:"ส่งอีเมลซ้ำถึง {shop} ({mail}) ใช่ไหม?", emCancelConfirm:"ยกเลิกการส่งอีเมลถึง {shop}? (กดส่งใหม่ได้ภายหลัง)", emSt_sent:"ส่งแล้ว", emSt_queued:"กำลังจะส่ง", emSt_ready:"พร้อมส่ง", emSt_hold:"รอตรวจสอบ", emSt_cancelled:"ยกเลิก", emSt_failed:"ส่งไม่สำเร็จ", emSt_notready:"ยังไม่ครบเงื่อนไข", emQueuedNow:"อนุมัติแล้ว ส่งภายใน 1 นาที", emQueuedAuto:"ส่งอัตโนมัติเวลา {t}", emWhyTables:"ยังมี {n} โต๊ะที่ยังไม่ยืนยัน/ชำระ", emWhySlip:"ยอดสลิปที่อ่านได้ {paid}/{total}", emFAll:"ทุกร้าน", emFUnsent:"ยังไม่ส่ง", emFSent:"ส่งแล้ว", emFNot:"ยังไม่ครบเงื่อนไข", emBadEmail:"อีเมลไม่ถูกรูปแบบ", emColShop:"ร้าน", emColMail:"อีเมล", emColState:"สถานะ", emNone:"ไม่มีร้านในรายการนี้", emLoadFail:"โหลดสถานะอีเมลไม่สำเร็จ", emRule:"ร้านจะพร้อมส่งเมื่อทุกโต๊ะยืนยันแล้ว/ชำระแล้ว และยอดสลิปที่อ่านแล้วครบ จากนั้นแอดมินกด ส่งอีเมล (หรือเปิดส่งอัตโนมัติ)",  editBtn:"✏️ แก้ไขข้อความ", editCancel:"ยกเลิก", editSave:"บันทึก", editReset:"คืนค่าเดิม", editResetConfirm:"คืนข้อความและการแสดงผลทั้งหมดของแดชบอร์ดเป็นค่าเดิม?", editHelp:"แก้ข้อความของภาษา {lang} (ภาษาที่เลือกอยู่) · เว้นว่างหรือพิมพ์เหมือนเดิม = ใช้ข้อความเดิม · ติ๊กออกเพื่อซ่อนส่วนนั้น", editSections:"ส่วนที่แสดง", editTexts:"ข้อความทุกจุด", editOriginal:"ข้อความเดิม", editYours:"ข้อความของคุณ", secKpis:"ตัวเลขสรุปรวม",  csvAll:"CSV ทุกการจอง", shopsFmt:"{n} ร้าน", noCat:"(ไม่ระบุ)" },
     en:{ btn:"📊 Summary dashboard", title:"Back-office summary dashboard", sub:"Live data (auto-refreshing) · transferred amounts come from the slips attached in the system; fake slips cannot be detected",
       kTables:"Total tables", kBooked:"Booked", kFree:"Free (open)", kLocked:"Locked", kOcc:"Occupancy", kShops:"Shops",
       kExpected:"Total due", kReceived:"Total per slips", kVerified:"Verified slip amount", kOutstanding:"Outstanding", kPower:"Tables needing power",
@@ -3691,7 +3703,7 @@
       tAll:"All", tNoLogo:"No logo", tIssue:"Incomplete (!)",
       zone:"Zone", total:"Total", booked:"Booked", locked:"Locked", free:"Free", amount:"Booked value", count:"Count",
       shop:"Shop", tablesCol:"Tables", price:"Price", paid:"Paid", balance:"Balance", status:"Status", slipsCol:"Slips", logo:"Logo", issues:"Issues", pay:"Payment",
-      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV by shop", hEmail:"Customer confirmation e-mails", emMode:"Mode", emOff:"Off (not sending)", emDry:"Dry run (nothing sent)", emLive:"Live", emDelay:"{n} min delay before sending", emStop:"⛔ Stop all sending", emStopConfirm:"Stop all e-mails to customers now?", emAutoOn:"✅ Auto send: ON", emAutoOff:"Auto send when complete: OFF", emAutoConfirm:"Turn on auto send? Shops that meet the rule and have no decision yet ({n} shops) will be e-mailed after {m} min (shops set to Review/Cancel are skipped).", emNotLive:"Not in live mode: pressing Send only approves. No e-mail reaches customers until live mode is switched on.", emSend:"Send e-mail", emReview:"Review", emCancel:"Cancel sending", emResend:"Send again", emSendConfirm:"Send the confirmation e-mail to {shop} ({mail})? It cannot be recalled.", emResendConfirm:"Send the e-mail again to {shop} ({mail})?", emCancelConfirm:"Cancel sending to {shop}? (you can send later)", emSt_sent:"✅ Sent", emSt_queued:"⏳ Going out", emSt_ready:"🟦 Ready", emSt_hold:"🟨 In review", emSt_cancelled:"⛔ Cancelled", emSt_failed:"❌ Failed", emSt_notready:"➖ Not complete", emQueuedNow:"Approved, goes out within 1 minute", emQueuedAuto:"Auto send at {t}", emWhyTables:"{n} table(s) not confirmed/paid yet", emWhySlip:"Slip amount read {paid}/{total}", emFAll:"All shops", emFUnsent:"Not sent", emFSent:"Sent", emFNot:"Not complete", emBadEmail:"Invalid e-mail address", emColShop:"Shop", emColMail:"E-mail", emColState:"Status", emNone:"No shops in this list", emLoadFail:"Could not load the e-mail status", emRule:"A shop is ready when every table is confirmed/paid and the read slip amounts cover the price; then an admin presses Send (or turn on auto send)",  editBtn:"✏️ Edit texts", editCancel:"Cancel", editSave:"Save", editReset:"Reset", editResetConfirm:"Reset all dashboard texts and sections to the defaults?", editHelp:"Editing the {lang} texts (current language) · leave empty or unchanged = default text · untick to hide a section", editSections:"Sections shown", editTexts:"All texts", editOriginal:"Original", editYours:"Your text", secKpis:"Summary numbers",  csvAll:"CSV all bookings", shopsFmt:"{n} shops", noCat:"(none)" },
+      search:"Search shop / table / category / contact", none:"Nothing found", yes:"Yes", no:"No", csv:"CSV by shop", hEmail:"Customer confirmation e-mails", emMode:"Mode", emOff:"Off (not sending)", emDry:"Dry run (nothing sent)", emLive:"Live", emDelay:"{n} min delay before sending", emStop:"Stop all sending", emStopConfirm:"Stop all e-mails to customers now?", emAutoOn:"Auto send: ON", emAutoOff:"Auto send when complete: OFF", emAutoConfirm:"Turn on auto send? Shops that meet the rule and have no decision yet ({n} shops) will be e-mailed after {m} min (shops set to Review/Cancel are skipped).", emNotLive:"Not in live mode: pressing Send only approves. No e-mail reaches customers until live mode is switched on.", emSend:"Send e-mail", emReview:"Review", emCancel:"Cancel sending", emResend:"Send again", emSendConfirm:"Send the confirmation e-mail to {shop} ({mail})? It cannot be recalled.", emResendConfirm:"Send the e-mail again to {shop} ({mail})?", emCancelConfirm:"Cancel sending to {shop}? (you can send later)", emSt_sent:"Sent", emSt_queued:"Going out", emSt_ready:"Ready", emSt_hold:"In review", emSt_cancelled:"Cancelled", emSt_failed:"Failed", emSt_notready:"Not complete", emQueuedNow:"Approved, goes out within 1 minute", emQueuedAuto:"Auto send at {t}", emWhyTables:"{n} table(s) not confirmed/paid yet", emWhySlip:"Slip amount read {paid}/{total}", emFAll:"All shops", emFUnsent:"Not sent", emFSent:"Sent", emFNot:"Not complete", emBadEmail:"Invalid e-mail address", emColShop:"Shop", emColMail:"E-mail", emColState:"Status", emNone:"No shops in this list", emLoadFail:"Could not load the e-mail status", emRule:"A shop is ready when every table is confirmed/paid and the read slip amounts cover the price; then an admin presses Send (or turn on auto send)",  editBtn:"✏️ Edit texts", editCancel:"Cancel", editSave:"Save", editReset:"Reset", editResetConfirm:"Reset all dashboard texts and sections to the defaults?", editHelp:"Editing the {lang} texts (current language) · leave empty or unchanged = default text · untick to hide a section", editSections:"Sections shown", editTexts:"All texts", editOriginal:"Original", editYours:"Your text", secKpis:"Summary numbers",  csvAll:"CSV all bookings", shopsFmt:"{n} shops", noCat:"(none)" },
     zh:{ btn:"📊 汇总仪表盘", title:"后台汇总仪表盘", sub:"实时数据（自动刷新）· 转账金额来自系统中附带的凭证，无法识别伪造凭证",
       kTables:"桌位总数", kBooked:"已订", kFree:"空位（开放）", kLocked:"已锁定", kOcc:"预订率", kShops:"商家数",
       kExpected:"应付总额", kReceived:"凭证合计", kVerified:"已核对凭证金额", kOutstanding:"未付金额", kPower:"需要用电的桌位",
@@ -3703,7 +3715,7 @@
       tAll:"全部", tNoLogo:"缺标志", tIssue:"未齐全 (!)",
       zone:"区域", total:"总数", booked:"已订", locked:"锁定", free:"空位", amount:"预订金额", count:"数量",
       shop:"商家", tablesCol:"桌位", price:"价格", paid:"已转", balance:"余额", status:"状态", slipsCol:"凭证", logo:"标志", issues:"问题", pay:"付款",
-      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV 按商家", hEmail:"客户确认邮件", emMode:"模式", emOff:"关闭（不发送）", emDry:"演练（不真正发送）", emLive:"正式发送", emDelay:"发送前延迟 {n} 分钟", emStop:"⛔ 停止全部发送", emStopConfirm:"立即停止向客户发送所有邮件？", emAutoOn:"✅ 自动发送：开", emAutoOff:"条件满足后自动发送：关", emAutoConfirm:"开启自动发送？符合条件且尚未决定的商家（{n} 家）将在 {m} 分钟后发送邮件（已设为待核对/取消的不会发送）。", emNotLive:"当前不是正式发送模式：点击发送仅为批准，开启正式发送前不会有邮件发给客户。", emSend:"发送邮件", emReview:"待核对", emCancel:"取消发送", emResend:"重新发送", emSendConfirm:"向 {shop}（{mail}）发送确认邮件？发出后无法撤回。", emResendConfirm:"向 {shop}（{mail}）重新发送邮件？", emCancelConfirm:"取消向 {shop} 发送？（之后可再发送）", emSt_sent:"✅ 已发送", emSt_queued:"⏳ 即将发送", emSt_ready:"🟦 可发送", emSt_hold:"🟨 待核对", emSt_cancelled:"⛔ 已取消", emSt_failed:"❌ 发送失败", emSt_notready:"➖ 未满足条件", emQueuedNow:"已批准，1 分钟内发送", emQueuedAuto:"自动发送时间 {t}", emWhyTables:"还有 {n} 个桌位未确认/未付款", emWhySlip:"已读取凭证金额 {paid}/{total}", emFAll:"全部商家", emFUnsent:"未发送", emFSent:"已发送", emFNot:"未满足条件", emBadEmail:"邮箱格式无效", emColShop:"商家", emColMail:"邮箱", emColState:"状态", emNone:"此列表没有商家", emLoadFail:"无法加载邮件状态", emRule:"所有桌位已确认/已付款且已读取的凭证金额足够后，商家即为可发送；然后管理员点击发送（或开启自动发送）",  editBtn:"✏️ 编辑文字", editCancel:"取消", editSave:"保存", editReset:"恢复默认", editResetConfirm:"将仪表盘所有文字和显示恢复为默认？", editHelp:"正在编辑 {lang} 文字（当前语言）· 留空或不改 = 默认文字 · 取消勾选可隐藏该部分", editSections:"显示的部分", editTexts:"所有文字", editOriginal:"原文", editYours:"你的文字", secKpis:"汇总数字",  csvAll:"CSV 全部预订", shopsFmt:"{n} 家", noCat:"（未填）" }
+      search:"搜索 商家 / 桌位 / 类别 / 联系人", none:"没有结果", yes:"有", no:"无", csv:"CSV 按商家", hEmail:"客户确认邮件", emMode:"模式", emOff:"关闭（不发送）", emDry:"演练（不真正发送）", emLive:"正式发送", emDelay:"发送前延迟 {n} 分钟", emStop:"停止全部发送", emStopConfirm:"立即停止向客户发送所有邮件？", emAutoOn:"自动发送：开", emAutoOff:"条件满足后自动发送：关", emAutoConfirm:"开启自动发送？符合条件且尚未决定的商家（{n} 家）将在 {m} 分钟后发送邮件（已设为待核对/取消的不会发送）。", emNotLive:"当前不是正式发送模式：点击发送仅为批准，开启正式发送前不会有邮件发给客户。", emSend:"发送邮件", emReview:"待核对", emCancel:"取消发送", emResend:"重新发送", emSendConfirm:"向 {shop}（{mail}）发送确认邮件？发出后无法撤回。", emResendConfirm:"向 {shop}（{mail}）重新发送邮件？", emCancelConfirm:"取消向 {shop} 发送？（之后可再发送）", emSt_sent:"已发送", emSt_queued:"即将发送", emSt_ready:"可发送", emSt_hold:"待核对", emSt_cancelled:"已取消", emSt_failed:"发送失败", emSt_notready:"未满足条件", emQueuedNow:"已批准，1 分钟内发送", emQueuedAuto:"自动发送时间 {t}", emWhyTables:"还有 {n} 个桌位未确认/未付款", emWhySlip:"已读取凭证金额 {paid}/{total}", emFAll:"全部商家", emFUnsent:"未发送", emFSent:"已发送", emFNot:"未满足条件", emBadEmail:"邮箱格式无效", emColShop:"商家", emColMail:"邮箱", emColState:"状态", emNone:"此列表没有商家", emLoadFail:"无法加载邮件状态", emRule:"所有桌位已确认/已付款且已读取的凭证金额足够后，商家即为可发送；然后管理员点击发送（或开启自动发送）",  editBtn:"✏️ 编辑文字", editCancel:"取消", editSave:"保存", editReset:"恢复默认", editResetConfirm:"将仪表盘所有文字和显示恢复为默认？", editHelp:"正在编辑 {lang} 文字（当前语言）· 留空或不改 = 默认文字 · 取消勾选可隐藏该部分", editSections:"显示的部分", editTexts:"所有文字", editOriginal:"原文", editYours:"你的文字", secKpis:"汇总数字",  csvAll:"CSV 全部预订", shopsFmt:"{n} 家", noCat:"（未填）" }
   };
   function dt_(k, vars){
     var d = DASH_I18N[lang] || DASH_I18N.th, v = d[k] != null ? d[k] : (DASH_I18N.th[k] != null ? DASH_I18N.th[k] : k);
@@ -3830,6 +3842,22 @@
       .then(function(){ if (dashOpen_ && !dashEditing_) renderDashboard(); });
   }
   var emFilter_ = "all";
+  var EM_ICONS_ = {
+    send:'<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+    review:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    cancel:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+    resend:'<path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/>',
+    sent:'<path d="M20 6 9 17l-5-5"/>',
+    queued:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    ready:'<circle cx="12" cy="12" r="4"/>',
+    hold:'<path d="M9 5v14M15 5v14"/>',
+    failed:'<path d="M12 8v5M12 17h.01"/><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+    notready:'<path d="M5 12h14"/>',
+    stop:'<path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M8 12h8"/>'
+  };
+  function emIc_(k){ return '<svg class="em-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(EM_ICONS_[k]||"")+'</svg>'; }
+  var EM_CLS_ = { sent:"ok", queued:"warn", ready:"info", hold:"warn", cancelled:"mute", failed:"bad", notready:"mute" };
+  var EM_IC_ = { sent:"sent", queued:"queued", ready:"ready", hold:"hold", cancelled:"cancel", failed:"failed", notready:"notready" };
   function emailSectionHtml_(){
     var h = '<div data-sec="email"><div class="dash-h">'+esc(dt_("hEmail"))+'</div>';
     if (emailErr_ && !emailStatus_) return h+'<div class="dash-sub">'+esc(dt_("emLoadFail"))+'</div></div>';
@@ -3842,14 +3870,14 @@
     h += '<div class="dash-sub" style="margin:0 0 8px">'+esc(dt_("emRule"))+'</div>'+
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'+
         '<span class="dash-pill '+modeCls+'">'+esc(dt_("emMode"))+': '+esc(modeTxt)+'</span>'+
-        '<button type="button" class="btn btn-sm'+(st.autoSend ? ' btn-primary' : '')+'" id="btnEmAuto" data-on="'+(st.autoSend ? "1" : "0")+'">'+esc(dt_(st.autoSend ? "emAutoOn" : "emAutoOff"))+'</button>'+
+        '<button type="button" class="em-switch" id="btnEmAuto" role="switch" aria-checked="'+(st.autoSend ? "true" : "false")+'" data-on="'+(st.autoSend ? "1" : "0")+'"><span class="knob"></span>'+esc(dt_(st.autoSend ? "emAutoOn" : "emAutoOff"))+'</button>'+
         (st.autoSend ? '<span class="dash-pill">'+esc(dt_("emDelay", { n: st.delayMinutes }))+'</span>' : '')+
-        (st.mode !== "off" ? '<button type="button" class="btn btn-sm btn-danger" id="btnEmStop">'+esc(dt_("emStop"))+'</button>' : '')+
+        (st.mode !== "off" ? '<button type="button" class="btn btn-sm btn-danger" id="btnEmStop">'+emIc_("stop")+esc(dt_("emStop"))+'</button>' : '')+
       '</div>';
     if (st.mode !== "live") h += '<div class="dash-sub" style="margin:0 0 8px;color:#8a5a00;">'+esc(dt_("emNotLive"))+'</div>';
     h += '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">'+
       ['sent','queued','ready','hold','cancelled','failed','notready'].map(function(k){
-        return '<span class="dash-pill '+({sent:"ok",queued:"warn",failed:"bad",ready:"",hold:"warn",cancelled:"",notready:""}[k])+'">'+esc(dt_("emSt_"+k))+' '+cnt[k]+'</span>';
+        return '<span class="dash-pill em '+EM_CLS_[k]+'">'+emIc_(EM_IC_[k])+esc(dt_("emSt_"+k))+' <b style="margin-left:5px;">'+cnt[k]+'</b></span>';
       }).join("")+
       '<select id="emFilter" style="margin-left:auto;">'+
         [["all","emFAll"],["unsent","emFUnsent"],["sent","emFSent"],["notready","emFNot"]].map(function(o){ return '<option value="'+o[0]+'"'+(emFilter_ === o[0] ? ' selected' : '')+'>'+esc(dt_(o[1]))+'</option>'; }).join("")+
@@ -3860,39 +3888,39 @@
       if (emFilter_ === "unsent") return x.state !== "sent";
       return true;
     });
-    function btn(act, x, key, cls){ return '<button type="button" class="btn btn-sm '+(cls||'')+'" data-emact="'+act+'" data-key="'+esc(x.shopKey)+'" data-shop="'+esc(x.shop)+'" data-mail="'+esc(x.email||'')+'">'+esc(dt_(key))+'</button>'; }
+    function btn(act, x, key, cls){ return '<button type="button" class="btn btn-sm '+(cls||'')+'" data-emact="'+act+'" data-key="'+esc(x.shopKey)+'" data-shop="'+esc(x.shop)+'" data-mail="'+esc(x.email||'')+'">'+emIc_(act === "approve" ? "send" : act)+esc(dt_(key))+'</button>'; }
     var rows = list.map(function(x){
-      var pill = function(c, txt){ return '<span class="dash-pill '+c+'">'+esc(txt)+'</span>'; };
+      var pill = function(c, txt, ic){ return '<span class="dash-pill em '+c+'">'+emIc_(ic)+esc(txt)+'</span>'; };
       var sub = "", acts = "", state = "";
       if (x.state === "sent"){
-        state = pill("ok", dt_("emSt_sent")); sub = (x.sentAt ? fmtDateTime_(x.sentAt) : "")+(x.by ? " · "+x.by : "");
+        state = pill("ok", dt_("emSt_sent"), "sent"); sub = (x.sentAt ? fmtDateTime_(x.sentAt) : "")+(x.by ? " · "+x.by : "");
         acts = btn("resend", x, "emResend");
       } else if (x.state === "failed"){
-        state = pill("bad", dt_("emSt_failed")); sub = x.error || "";
+        state = pill("bad", dt_("emSt_failed"), "failed"); sub = x.error || "";
         acts = btn("resend", x, "emResend");
       } else if (x.state === "notready"){
-        state = pill("", dt_("emSt_notready"));
+        state = pill("mute", dt_("emSt_notready"), "notready");
         sub = x.reason === "tables" ? dt_("emWhyTables", { n: x.nOpen }) : dt_("emWhySlip", { paid: Math.round(x.paid), total: Math.round(x.total) });
       } else {
         var canSend = x.validEmail !== false;
         if (x.state === "queued"){
-          state = pill("warn", dt_("emSt_queued"));
+          state = pill("warn", dt_("emSt_queued"), "queued");
           sub = x.decision === "approved" ? dt_("emQueuedNow") : dt_("emQueuedAuto", { t: new Date(x.sendAt).toLocaleTimeString(currentLocale(), { hour:"2-digit", minute:"2-digit" }) });
           acts = (x.decision === "approved" ? "" : (canSend ? btn("approve", x, "emSend", "btn-primary") : "")) + btn("review", x, "emReview") + btn("cancel", x, "emCancel", "btn-danger");
         } else if (x.state === "hold"){
-          state = pill("warn", dt_("emSt_hold")); sub = x.by || "";
+          state = pill("warn", dt_("emSt_hold"), "hold"); sub = x.by || "";
           acts = (canSend ? btn("approve", x, "emSend", "btn-primary") : "") + btn("cancel", x, "emCancel", "btn-danger");
         } else if (x.state === "cancelled"){
-          state = pill("", dt_("emSt_cancelled")); sub = x.by || "";
+          state = pill("mute", dt_("emSt_cancelled"), "cancel"); sub = x.by || "";
           acts = (canSend ? btn("approve", x, "emSend", "btn-primary") : "") + btn("review", x, "emReview");
         } else {
-          state = pill("", dt_("emSt_ready"));
+          state = pill("info", dt_("emSt_ready"), "ready");
           acts = (canSend ? btn("approve", x, "emSend", "btn-primary") : "") + btn("review", x, "emReview") + btn("cancel", x, "emCancel", "btn-danger");
         }
         if (!canSend) sub = (sub ? sub+" · " : "")+dt_("emBadEmail");
       }
       return '<tr><td><b>'+esc(x.shop)+'</b><div class="mono" style="color:var(--ink-faint);font-size:11px;">'+esc((x.tables||[]).join(" "))+'</div></td><td>'+esc(x.email)+'</td>'+
-        '<td>'+state+(sub ? '<div style="color:var(--ink-faint);font-size:11px;margin-top:2px;">'+esc(sub)+'</div>' : '')+'</td><td style="white-space:nowrap;">'+acts+'</td></tr>';
+        '<td>'+state+(sub ? '<div style="color:var(--ink-faint);font-size:11px;margin-top:2px;">'+esc(sub)+'</div>' : '')+'</td><td><div class="em-actions">'+acts+'</div></td></tr>';
     }).join("");
     h += '<div class="dash-table-wrap"><table class="dash-table"><tr><th>'+esc(dt_("emColShop"))+'</th><th>'+esc(dt_("emColMail"))+'</th><th>'+esc(dt_("emColState"))+'</th><th></th></tr>'+
       (rows || '<tr><td colspan="4" style="text-align:center;color:var(--ink-faint);padding:14px;">'+esc(dt_("emNone"))+'</td></tr>')+'</table></div>';
